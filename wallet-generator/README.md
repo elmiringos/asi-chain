@@ -1,8 +1,21 @@
-# Create wallet
+# ASI:Chain - Wallet Generator
+
+This guide describes the process of creating a full set of keys for working with **ASI:Chain** nodes and CLI wallet.
+
+Keys are created using the secp256k1 algorithm, which is supported by the **ASI:Chain** consensus algorithm.
+
+Using this script, you generate a full set of keys:
+* Address (e.g., 1111LAd2...1BPcvHftP)
+* Private key (e.g., b67533f...d77cbcb)
+* Public key (e.g., 0457febafcc25dd34...24c8216c94b4ae661c)
+
+The generated key's set is cryptographically unique and secure.
+
+The key set will be displayed once in the console after running the script. Additionally, a backup file will be created in the current directory with the filename `wallet_current-date-and-time.txt`, which you should **backup in secure storage**.
 
 ## Requirements
 ```
-Node.js version 18 or higher
+Node.js version 20 or higher
 ```
 
 ## Install Node.js
