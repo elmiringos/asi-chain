@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "ASI:Chain blockchain wallet and keys generator with cryptographic utilities",
   "scripts": {
-    "generate": "npx ts-node walletGeneratorScript.ts"
+    "generate": "ts-node walletGeneratorScript.ts"
   },
   "keywords": [
     "blockchain",
