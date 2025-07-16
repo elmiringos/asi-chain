@@ -1,6 +1,10 @@
 # ASI:Chain - Testnet
 ## Context and Overview
 
+Testnet portal, detailed documentation and information about testnet is available at the link:
+
+https://asi-testnet.singularitynet.io/
+
 ## Network Configuration
 
 We have launched a custom blockchain based on F1R3FLY with the following node types:
