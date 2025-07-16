@@ -1,25 +1,72 @@
 import { defineConfig } from 'vitepress'
 
-// https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "ASI Testnet docs",
   description: "ASI Testnet docs",
   themeConfig: {
-    // https://vitepress.dev/reference/default-theme-config
-    // nav: [
-    //   { text: 'Home', link: '/' },
-    //   { text: 'Examples', link: '/markdown-examples' }
-    // ],
-
-    // sidebar: [
-    //   {
-    //     text: 'Examples',
-    //     items: [
-    //       { text: 'Markdown Examples', link: '/markdown-examples' },
-    //       { text: 'Runtime API Examples', link: '/api-examples' }
-    //     ]
-    //   }
-    // ],
+    sidebar: [
+      {
+        text: 'Node Image',
+        collapsed: true,
+        items: [
+          { text: 'Node Image Source', link: '/node-image/' },
+          { text: 'Validator Node Setup', link: '/node-image/validator/' },
+        ]
+      },
+      {
+        text: 'YAML Configuration',
+        collapsed: true,
+        items: [
+          { text: 'YAML File Source', link: '/yaml-configuration/' },
+          { text: 'YAML Parameters & Examples', link: '/yaml-configuration/parameters/' },
+        ]
+      },
+      {
+        text: 'Explorer',
+        collapsed: true,
+        items: [
+          { text: 'Explorer Overview', link: '/explorer/' },
+          { text: 'Explorer Field Guide', link: '/explorer/guide/' },
+        ]
+      },
+      {
+        text: 'Network Access',
+        collapsed: true,
+        items: [
+          { text: 'Explorer & RPC Endpoints', link: '/network-access/' },
+          { text: 'RNode Address Generation', link: '/network-access/address-generation/' },
+        ]
+      },
+      {
+        text: 'Network Configuration',
+        collapsed: true,
+        items: [
+          { text: 'Network Configuration Overview', link: '/network-configuration/' },
+          { text: 'Network Parameters', link: '/network-configuration/parameters/' },
+          { text: 'Network Topology', link: '/network-configuration/topology/' },
+        ]
+      },
+      {
+        text: 'Quick Start',
+        collapsed: true,
+        items: [
+          { text: 'Quick Start Guide', link: '/quick-start/' },
+          { text: 'Configuration Guide', link: '/quick-start/configuration/' },
+          { text: 'Message Exchange Scenarios', link: '/quick-start/messages/' },
+          { text: 'Common Errors', link: '/quick-start/troubleshooting/' },
+        ]
+      },
+      {
+        text: 'Interaction Examples',
+        collapsed: true,
+        items: [
+          { text: 'Interaction Scenarios', link: '/interaction-examples/' },
+          { text: 'Simple Smart Contract', link: '/interaction-examples/smart-contracts/' },
+          { text: 'View Block History', link: '/interaction-examples/block-history/' },
+          { text: 'Check Balance', link: '/interaction-examples/balance-check/' },
+        ]
+      }
+    ],
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/asi-alliance/asi-chain/' }

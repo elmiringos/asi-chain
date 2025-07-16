@@ -1,87 +1,102 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
 layout: home
+title: ASI:Chain Documentation
+description: Complete guide for ASI:Chain blockchain network setup and operations
 
-# hero:
-#   name: "ASI Testnet"
-#   text: "ASI Testnet docs"
-#   tagline: My great project tagline
-#   actions:
-#     - theme: brand
-#       text: Markdown Examples
-#       link: /markdown-examples
-#     - theme: alt
-#       text: API Examples
-#       link: /api-examples
+hero:
+  name: "ASI:Chain"
+  text: "Blockchain Network Documentation"
+  tagline: "Your comprehensive guide to joining and operating on the ASI:Chain network"
+  image:
+    # src: /asi-chain-logo.png
+    alt: ASI:Chain
+  actions:
+    - theme: brand
+      text: Quick Start
+      link: /quick-start/
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/asi-alliance/asi-chain
 
-# features:
-#   - title: Feature A
-#     details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-#   - title: Feature B
-#     details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-#   - title: Feature C
-#     details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-# ---
+features:
+  - icon: 🖥️
+    title: Node Image Source
+    details: Learn about the Docker image used for ASI:Chain nodes and how to obtain it
+    link: /node-image/
+    
+  - icon: 📋
+    title: YAML Configuration
+    details: Understand YAML configuration files and their parameters
+    link: /yaml-configuration/
+    
+  - icon: 🔍
+    title: Explorer
+    details: Learn about the blockchain explorer and how to interpret its data
+    link: /explorer/
+    
+  - icon: 🌐
+    title: Network Access
+    details: Explorer address and RPC endpoints for network interaction
+    link: /network-access/
+    
+  - icon: ⚙️
+    title: Network Configuration
+    details: Current network parameters, validator setup, and topology
+    link: /network-configuration/
+    
+  - icon: 🚀
+    title: Quick Start Guide
+    details: Step-by-step guide to connect to ASI:Chain network
+    link: /quick-start/
+    
+  - icon: 🔧
+    title: Troubleshooting
+    details: Common errors and solutions when setting up nodes
+    link: /quick-start/troubleshooting/
+    
+  - icon: 💡
+    title: Interaction Examples
+    details: Practical examples of network interactions and smart contracts
+    link: /interaction-examples/
 ---
 
-# ASI:Chain - Testnet
-## Context and Overview
+## Welcome to ASI:Chain
 
-## Network Configuration
+ASI:Chain is a blockchain network based on F1R3FLY technology, designed for the ASI Alliance ecosystem. This documentation provides comprehensive guidance for:
 
-We have launched a custom blockchain based on F1R3FLY with the following node types:
+- Setting up observer and validator nodes
+- Understanding network configuration
+- Interacting with the blockchain
+- Deploying smart contracts
+- Troubleshooting common issues
 
-* 1 Bootstrap Node
+### Current Network Status
 
-* 4 Validator Nodes
+<div class="tip custom-block" style="padding-top: 8px">
 
-* 1 Observer Node
+**Testnet is Live!** 🟢
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Bootstrap  │ ──▶ │ Validator 1 │ ──▶ | Validator 2 │
-│  (Genesis)  │     │             │     |             │
-└─────────────┘     └─────────────┘     └─────────────┘
-       │                   │                   │
-       ▼                   ▼                   ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Validator 3 │ ──▶ │ Validator 4 │ ──▶ │  Observer   │
-│             │     │  (Extra)    │     │ (Read-only) │
-└─────────────┘     └─────────────┘     └─────────────┘
-```
+- Bootstrap Node: `rnode://138410b5da898936ec1dc13fafd4893950eb191b@44.198.8.24?protocol=40400&discovery=40404`
+- Block Explorer: [http://44.198.8.24:5173/](http://44.198.8.24:5173/)
+- Network: 1 Bootstrap + 4 Validators + 1 Observer
 
-Bootstrap Node
+</div>
 
-```
-bootstrap: `rnode://138410b5da898936ec1dc13fafd4893950eb191b@44.198.8.24?protocol=40400&discovery=40404`
-```
+### Getting Started
 
-Validators
+Choose your path based on your needs:
 
-```bash
-Validator #1: rnode://46412097b9895ccf786c84d8db3a91ec80762a8e@44.198.8.24?protocol=40410?discovery=40414
-Validator #2: rnode://992703c92b5ea37e27256a687cdb68d8b182badf@44.198.8.24?protocol=40420&discovery=40424
-Validator #3: rnode://67676f0954467aa3507f36fe801b8ec12370501@44.198.8.24?protocol=40430?discovery=40434
-Validator #4: rnode://73992afad92256bcc914836c40decccdbd0048d4@44.198.8.24?protocol=40440?discovery=40444
-```
+1. **Want to validate blocks?** → [Set up a Validator Node](/node-image/validator/)
+2. **Just exploring?** → [View the Block Explorer](http://44.198.8.24:5173/)
 
-## Explorer
+### Quick Links
 
-You can explore the chain via the testnet block explorer:
-Link to explorer: http://44.198.8.24:5173/
+- [Generate RNode Address](/network-access/address-generation/)
+- [Network Parameters](/network-configuration/parameters/)
+- [Deploy Your First Smart Contract](/interaction-examples/smart-contracts/)
+- [Common Errors & Solutions](/quick-start/troubleshooting/)
 
-⚠️ At the moment, access to validator nodes is only possible via direct access to the machine, under the validator user.
+### Support
 
-## External Validators Status
-
-External validator joining is currently disabled and under testing. The bonding and connection process from external machines is being validated. We're coordinating this work with the official F1R3FLY and MetaCycle teams.
-
-Once stable support for external validators is enabled, we will:
-
-* Update this documentation
-
-* Provide additional step-by-step instructions
-
-* Open the network for bonding from outside nodes
-
-For advanced users who want to dive in early, we welcome your feedback. Stay tuned for updates as we finalize external validator onboarding!
+For additional support and updates:
+- GitHub: [asi-alliance/asi-chain](https://github.com/asi-alliance/asi-chain)
