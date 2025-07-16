@@ -1,7 +1,8 @@
 # ASI:Chain - How you can connect to chain?
 
-This instruction describes how you will be able to connect to the ASI:Chain blockchain network when this feature becomes available.
-Stay tuned for updates as we finalize external validator onboarding!
+This instruction describes how you will be able to connect to the ASI:Chain and become a validator with our prepared wallets' keys.
+
+We are working on allowing you to create your own wallets, and becomes a your validator with your wallets, but for now this feature is in development.
 
 ## System Requirements
 - **RAM**: 16GB minimum (Docker Desktop needs 16GB allocated on macOS)
@@ -43,105 +44,79 @@ This keys are requirment for managing your wallet and validator node
 
 See more in [instruction](https://github.com/asi-alliance/asi-chain/blob/master/wallet-generator/README.md)
 
+>[!CAUTION]
+> CONNECTION OF VALIDATORS WITH NEW WALLETS IS UNDER DEVELOPMENT.
+
+>[!TIP]
+> Connection with new wallets is currently not available, **use our prepared wallet keys sets from the [file](https://github.com/asi-alliance/asi-chain/blob/master/testnet-wallets.txt)**
+
 Clone the repository
 
 ```bash
-git clone https://github.com/F1R3FLY-io/f1r3fly.git
+git clone https://github.com/asi-alliance/asi-chain.git
 ```
 
 Change directory
 ```bash
-cd docker
+cd asi-chain/chain
 ```
 
-Next step: Setup observer node:
+## 1. Setup `.env` file
 
-In `docker` directory edit `observer.yml` file
+Use `.env.example` as an example for your `.env` file.
 
-You need line:
-`--bootstrap=rnode://138410b5da898936ec1dc13fafd4893950eb191b@$BOOTSTRAP_HOST?protocol=40400&discovery=40404`
+Make the following changes:
 
-change it to our `BOOTSTRAP_HOST` but now it's under construction
+`VALIDATOR_PRIVATE_KEY` — specify the validator's private key.
 
-Setup `.env` file in `/docker/` directory:
-```bash
-cd ..
-check that directory is /docker/
-```
+`VALIDATOR_HOST` — set the public IP address of the machine where this validator will be running.
 
-Edit `.env` file:
-Change param `READONLY_HOST` to your public IP address
+> [!TIP]
+> **Use our prepared wallet keys sets from the [file](https://github.com/asi-alliance/asi-chain/blob/master/testnet-wallets.txt)**
 
-Add in file your generated private-key and host of your server:
-```
-VALIDATOR_HOST=<YOUR_IP_ADDRESS>
-VALIDATOR_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
-```
+## 2. Setup `validator.yml`
 
-You should create own `validator.conf` in directory `./docker/conf`
+Setup ports in the ports section or leave it by default:
 
-```bash
-cd conf
-```
-
-Create your own `validator.conf` using one of validator's config files as example
-
-You just need to change some parameters in your `validator.conf` file:
-
-You need line:
-`--bootstrap=rnode://138410b5da898936ec1dc13fafd4893950eb191b@$BOOTSTRAP_HOST?protocol=40400&discovery=40404`
-
-change it to our `BOOTSTRAP_HOST` but now it's under construction
-
-```
-api-server {
-  ...
-  host = <IP ADDRESS OF YOUR VALIDATOR>
-  or use .env file but comment host here
-  ...
-}
-casper {
-   ...
-   validator-public-key = <YOUR PUBLIC KEY>
-   validator-private-key = <YOUR PRIVATE KEY>
-   ...
-}
-```
-also setup all ports
-
-After everything have been set up - you are ready to launch validator and connect it to our network.
-
-Create your own `validator.yml` using one of validator's config files as example
-
-You just need to change some parameters in your `validator.yml` file:
-
-Rename $VALIDATOR_HOST to your validator name and path
-```
+```yml
 ...
-container_name: $VALIDATOR_HOST
-...
-...
-volumes:
-      - ./data/$VALIDATOR_HOST:/var/lib/rnode/
-      - ./conf/validator.conf:/var/lib/rnode/rnode.conf
-      - ./conf/validator.certificate.pem:/var/lib/rnode/node.certificate.pem
-      - ./conf/validator.key.pem:/var/lib/rnode/node.key.pem
-      - ./conf/logback.xml:/var/lib/rnode/logback.xml
+ports:
+  # Setup your node's ports here
+  - "40400:40400"
+  - "40401:40401"
+  - "40402:40402"
+  - "40403:40403"
+  - "40404:40404"
+  - "40405:40405"
 ...
 ```
 
-1. You need launch validator node and connect to our shard.
+## 3. Setup your `conf/validator.conf`
+
+Replace these `validator-public-key` and `validator-private-key` in `casper` section of `conf/validator.conf` file with the current keys of the validator you're connecting to the network.
+
+> [!TIP]
+> **Use our prepared wallet keys sets from the [file](https://github.com/asi-alliance/asi-chain/blob/master/testnet-wallets.txt)**
+
+And also configure the **ports** that were previously configured in `validator.yml`
+
+## 4. Launch your validator node
+
+Go to the directory `asi-chain/chain` and launch your validator node:
 
 ```bash
-docker compose -f validator.yml up -d
+cd asi-chain/chain
 ```
 
-Check logs of observer:
 ```bash
-docker compose -f validator.yml logs -f
+sudo docker compose -f validator.yml up -d
 ```
 
-You should see smth like this:
+Check logs and wait full sync of your node:
+```bash
+sudo docker logs validator -tail 20
+```
+And wait logs:
 ```
 rnode.readonly  | 2025-07-04 14:50:53,964 [node-runner-24] INFO  coop.rchain.casper.engine.Initializing - Approved state for block Block #0 (b22fa19038...) with empty parents (supposedly genesis) is successfully restored.
 rnode.readonly  | 2025-07-04 14:51:04,934 [node-runner-27] INFO  coop.rchain.casper.engine.Running$ - Received ForkChoiceTipRequest from rnode.validator2
@@ -154,51 +129,48 @@ rnode.readonly  | 2025-07-04 14:51:05,916 [node-runner-24] INFO  coop.rchain.cas
 rnode.readonly  | 2025-07-04 14:51:05,976 [node-runner-24] INFO  coop.rchain.casper.engine.Running$ - Sending tips [b22fa19038...] to rnode.validator3
 ```
 
-2. Set bond via CLI with private key from `conf/validator.conf`
+This will indicate that the node has finished its synchronization with the network
 
-Go to terminal with CLI and launch command:
+## 5. Deploy contracts and propose blocks
+
 ```bash
-cargo run -- bond-validator --private-key <YOU_PRIVATE_KEY>
+cd asi-chain/chain
 ```
 
-You should see:
-```
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.34s
-     Running `target/debug/node_cli bond-validator --private-key <YOU_PRIVATE_KEY>`
-🔗 Bonding new validator to the network
-💰 Stake amount: 50000000000000 REV
-🚀 Deploying bonding transaction...
-✅ Bonding deploy successful!
-⏱️  Deploy time: 229.72ms
-🆔 Deploy ID: Success!
-DeployId is: 3045022100b4a835effb0941fc755957878498b71f2ac761738f6346e7f8683f2a560a55e60220767e77a99850dc6ddaaf9c9f883950a06708a16cf6c63fd503da107b43e41f67
-```
+Deploy Hello World contract:
 
-3. After set bond you need wait for a few minutes and launch your validator
-
-Use example `validator.yml` file from any validator
-
-Return to terminal where opened `f1r3fly/docker` directory and run command
 ```bash
-docker compose -f validator.yml up -d
+sudo docker compose -f "validator.yml" exec "validator" /opt/docker/bin/rnode \
+    --grpc-host localhost \
+    --grpc-port "40402 or your port" \
+    deploy \
+    --private-key "<PRIVATE-KEY>" \
+    --phlo-limit 10000000 \
+    --phlo-price 1 \
+    --valid-after-block-number 0 \
+    --shard-id root \
+    "/opt/docker/examples/stdout.rho"
 ```
 
-After a few minutes you should see in logs of your validator:
-```
-rnode.validator4  | 2025-06-15 15:21:10,660 [node-runner-32] INFO  coop.rchain.node.runtime.ServersInstances$ - Listening for traffic on rnode://73992afad92256bcc914836c40decccdbd0048d4@rnode.validator4?protocol=40400&discovery=40404.
-rnode.validator4  | 2025-06-15 15:21:10,853 [node-runner-28] INFO  coop.rchain.comm.transport.GrpcTransportClient - Creating new channel to peer rnode://de6eed5d00cf080fc587eeb412cb31a75fd10358@52.119.8.109?protocol=40400&discovery=40404
-rnode.validator4  | 2025-06-15 15:21:15,941 [node-runner-28] INFO  coop.rchain.comm.transport.GrpcTransportClient - Creating new channel to peer rnode://992703c92b5ea37e27256a687cdb68d8b182badf@rnode.validator2?protocol=40400&discovery=40404
-rnode.validator4  | 2025-06-15 15:21:16,063 [node-runner-28] INFO  coop.rchain.comm.transport.GrpcTransportClient - Creating new channel to peer rnode://138410b5da898936ec1dc13fafd4893950eb191b@rnode.bootstrap?protocol=40400&discovery=40404
-rnode.validator4  | 2025-06-15 15:21:16,153 [node-runner-28] INFO  coop.rchain.comm.transport.GrpcTransportClient - Creating new channel to peer rnode://46412097b9895ccf786c84d8db3a91ec80762a8e@rnode.validator1?protocol=40400&discovery=40404
-rnode.validator4  | 2025-06-15 15:21:16,269 [node-runner-29] INFO  coop.rchain.comm.transport.GrpcTransportClient - Creating new channel to peer rnode://67676f0954467aa3507f36fe801b8ec12370501d@rnode.validator3?protocol=40400&discovery=40404
+You should see a message like this:
 
-Responded to protocol handshake request from rnode://46412097b9895ccf786c84d8db3a91ec80762a8e@rnode.validator1?protocol=40400&discovery=40404
-rnode.readonly  | 2025-06-15 07:52:02,821 [node-runner-27] INFO  coop.rchain.comm.rp.Connect$ - Peers: 4 or more
-```
-
-Contract deploy:
 ```bash
-# Deploy to validator
-./target/release/node_cli deploy \
-  -f ../rholang/examples/stdout.rho -p 40412
+Response: Success!
+DeployId is: 304402206c435cee64d97d123f0c1b4552b3568698e64096a29fb50ec38f11a6c5f7758b022002e05322156bf5ed878ce20cef072cd8faf9e8bb15b58131f2fee06053b5d1c5
 ```
+
+this means you have sent your first smart contract to ASI:Chain!
+
+
+Propose new block to ASI:Chain with your contract:
+```bash
+sudo docker compose -f "validator.yml" exec "validator" /opt/docker/bin/rnode --grpc-host localhost --grpc-port "40402 or your port" propose
+```
+
+You should see a message like this:
+
+```bash
+Response: Success! Block 4dda69c62838e18abd3c131818e60110ac3caccc66ec05792cedb327a3bafff7 created and added.
+```
+
+this means you have proposed your first block to ASI:Chain!
