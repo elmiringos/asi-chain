@@ -1,6 +1,24 @@
 const webpack = require('webpack');
 
 module.exports = function override(config, env) {
+  // Exclude mock files from the build
+  config.module.rules.forEach(rule => {
+    if (rule.oneOf) {
+      rule.oneOf.forEach(loader => {
+        if (loader.test && loader.test.toString().includes('tsx?')) {
+          loader.exclude = [
+            /node_modules/,
+            /__mocks__/,
+            /__tests__/,
+            /\.test\.(ts|tsx)$/,
+            /\.spec\.(ts|tsx)$/,
+            /setupTests\.ts$/
+          ];
+        }
+      });
+    }
+  });
+
   // Existing polyfills for crypto and streams
   config.resolve.fallback = {
     ...config.resolve.fallback,

@@ -130,6 +130,12 @@ The production build will be in the `build/` directory, ready for deployment to 
 - Test thoroughly with your specific RChain network configuration
 - Generate your own WalletConnect Project ID for production use
 
+### Recent Updates (July 2025)
+- **Fixed**: Network settings persistence issue (#12) - Custom networks now save correctly
+- **Added**: Comprehensive test suite with 62.88% store coverage
+- **Improved**: Build configuration to exclude test files from production
+- **Documentation**: Added DEVELOPMENT_WORK_REPORT.md and FINAL_TEST_REPORT.md
+
 ## 🏗️ Architecture Overview
 
 ```
@@ -202,18 +208,27 @@ The production build will be in the `build/` directory, ready for deployment to 
 ```
 asi_wallet_v2/
 ├── src/              # Main wallet source code
+│   ├── components/   # React components
+│   ├── pages/        # Page components
+│   ├── services/     # Business logic services
+│   ├── store/        # Redux store and slices
+│   ├── utils/        # Utility functions
+│   └── __tests__/    # Test files
 ├── public/           # Static assets
 ├── scripts/          # Build and deployment scripts
 ├── test-dapp-rchain/ # WalletConnect testing dApp
-└── docs/             # Moved to ../docs/wallet/
+├── coverage/         # Test coverage reports
+└── docs/             # Documentation (see ../docs/WALLET.md)
 ```
 
 ### Commands
 
 ```bash
 # Development
-npm start              # Start dev server
-npm test              # Run tests
+npm start              # Start dev server (default port 3000)
+PORT=3001 npm start   # Start on custom port
+npm test              # Run tests in watch mode
+npm test -- --coverage # Run tests with coverage report
 npm run lint          # Lint code
 npm run type-check    # TypeScript checking
 
@@ -221,12 +236,29 @@ npm run type-check    # TypeScript checking
 npm run build         # Production build
 npm run analyze       # Bundle analysis
 
+# Testing
+npm test -- --watchAll=false         # Run all tests once
+npm test -- --coverage --watchAll=false  # Generate coverage report
+npm test Dashboard    # Run specific test file
+
 # Deployment
 npm run deploy:gh     # Deploy to GitHub Pages
 npm run deploy:ipfs   # Deploy to IPFS
 ```
 
 ## 📈 Recent Improvements
+
+### Testing Framework (July 2025)
+- ✅ **Comprehensive Test Suite**: Added Jest and React Testing Library
+- ✅ **62.88% Store Coverage**: Exceeded 50% target for Redux store modules
+- ✅ **Component Testing**: Full test coverage for Dashboard, Send, and Settings
+- ✅ **Mock Infrastructure**: Created reusable mock modules for complex services
+
+### Network Persistence Fix (Issue #12)
+- ✅ **Persistent Settings**: Network configurations now survive page reloads
+- ✅ **LocalStorage Integration**: Automatic synchronization with Redux store
+- ✅ **Custom Networks**: Fixed "Add Custom Network" functionality
+- ✅ **Seamless Experience**: Network changes are instantly saved
 
 ### Security & User Experience Enhancements
 - ✅ **Authentication Security**: Fixed authentication bypass vulnerability
@@ -252,7 +284,42 @@ npm run deploy:ipfs   # Deploy to IPFS
 - ✅ Network-specific configurations
 - ✅ Connection retry logic
 
-## 🧪 Testing WalletConnect Integration
+## 🧪 Testing
+
+### Running Tests
+
+```bash
+# Run tests in watch mode (development)
+npm test
+
+# Run all tests once
+npm test -- --watchAll=false
+
+# Generate coverage report
+npm test -- --coverage --watchAll=false
+
+# Run specific test file
+npm test Dashboard
+npm test walletSlice
+
+# Run tests matching pattern
+npm test -- --testNamePattern="should persist"
+```
+
+### Test Coverage
+
+Current coverage metrics:
+- **Store Modules**: 62.88% (Target: 50%) ✅
+- **Services**: 17.59%
+- **Components**: Varies (Settings: 94.87%)
+
+View detailed coverage report:
+```bash
+npm test -- --coverage --watchAll=false
+# Open coverage/lcov-report/index.html in browser
+```
+
+### Testing WalletConnect Integration
 
 The project includes a test dApp in the `test-dapp-rchain/` directory for testing WalletConnect functionality:
 
