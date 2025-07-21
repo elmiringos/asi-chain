@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import Editor, { loader } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { RootState } from 'store';
 import { RChainService } from 'services/rchain';
@@ -283,11 +283,9 @@ export const IDE: React.FC = () => {
 
   // Initialize Monaco editor with Rholang support
   useEffect(() => {
-    loader.init().then(monaco => {
-      // Register language and themes with the loaded monaco instance
-      registerRholangLanguage();
-      setMonacoInitialized(true);
-    });
+    // Monaco is now auto-initialized in newer versions
+    registerRholangLanguage();
+    setMonacoInitialized(true);
   }, []);
 
   // File management state

@@ -347,6 +347,12 @@ A modern, secure cryptocurrency wallet for the ASI Chain:
 - **WalletConnect Integration**: Connect to dApps using QR codes or deep links
 - **Integrated Rholang IDE**: Built-in Monaco editor for smart contract development
 
+#### Recent Updates (July 2025)
+- **Network Persistence Fix**: Custom network settings now persist across page reloads (Issue #12)
+- **Comprehensive Testing**: Added Jest testing framework with 62.88% store coverage
+- **LocalStorage Integration**: Automatic synchronization between Redux store and browser storage
+- **Build Optimization**: Excluded test files from production builds for smaller bundle size
+
 See the [Wallet Documentation](docs/WALLET.md) for usage instructions and installation guide.
 
 ### Block Explorer
@@ -481,7 +487,8 @@ See the [Documentation Index](docs/INDEX.md) for detailed information about the 
 - ✅ Automated deployment with `deploy.sh`
 - ✅ Block production past block 50 (VABN patch)
 - ✅ Finalizer bot for continuous operation
-- ✅ ASI Wallet v2 with WalletConnect
+- ✅ ASI Wallet v2 with WalletConnect and persistent network settings
 - ✅ Block Explorer with real-time updates
 - ✅ Comprehensive documentation
 - ✅ Reduced memory requirements (2GB validators, 1GB observer)
+- ✅ Testing framework with 62.88% store coverage for wallet

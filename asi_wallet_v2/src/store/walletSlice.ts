@@ -4,7 +4,7 @@ import { RChainService } from 'services/rchain';
 import { SecureStorage } from 'services/secureStorage';
 import TransactionHistoryService from 'services/transactionHistory';
 
-const initialNetworks: Network[] = [
+const defaultNetworks: Network[] = [
   {
     id: 'custom',
     name: 'Custom Network',
@@ -36,24 +36,100 @@ const initialNetworks: Network[] = [
   },
 ];
 
-// Load accounts from secure storage (without private keys)
-const loadAccountsFromSecureStorage = (): Account[] => {
-  const secureAccounts = SecureStorage.getEncryptedAccounts();
-  return secureAccounts.map(acc => ({
-    ...acc,
-    privateKey: undefined,
-  } as Account));
+// Storage key for networks
+const NETWORKS_STORAGE_KEY = 'asi_wallet_networks';
+
+// Load networks from localStorage or use defaults
+const loadNetworks = (): Network[] => {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return defaultNetworks;
+  }
+  
+  try {
+    const stored = localStorage.getItem(NETWORKS_STORAGE_KEY);
+    if (stored) {
+      const networks = JSON.parse(stored) as Network[];
+      // Merge with defaults to ensure all default networks exist
+      const networkMap = new Map<string, Network>();
+      
+      // Add stored networks first (to preserve user modifications)
+      networks.forEach(n => networkMap.set(n.id, n));
+      
+      // Add default networks only if not already present
+      defaultNetworks.forEach(n => {
+        if (!networkMap.has(n.id)) {
+          networkMap.set(n.id, n);
+        }
+      });
+      
+      return Array.from(networkMap.values());
+    }
+  } catch (error) {
+    console.error('Failed to load networks from localStorage:', error);
+  }
+  return defaultNetworks;
 };
 
-const initialState: WalletState = {
-  accounts: loadAccountsFromSecureStorage(),
-  selectedAccount: null,
-  transactions: [],
-  networks: initialNetworks,
-  selectedNetwork: initialNetworks.find(n => n.id === 'custom') || initialNetworks[0], // Default to custom network
-  isLoading: false,
-  error: null,
+// Save networks to localStorage
+const saveNetworks = (networks: Network[]) => {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  
+  try {
+    localStorage.setItem(NETWORKS_STORAGE_KEY, JSON.stringify(networks));
+  } catch (error) {
+    console.error('Failed to save networks to localStorage:', error);
+  }
 };
+
+// Lazy load networks to avoid SSR issues
+const getInitialNetworks = () => {
+  // For initial state, just use defaults
+  // The actual loading from localStorage will happen in a useEffect
+  return defaultNetworks;
+};
+
+const initialNetworks = getInitialNetworks();
+
+// Load accounts from secure storage (without private keys)
+const loadAccountsFromSecureStorage = (): Account[] => {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return [];
+  }
+  
+  try {
+    const secureAccounts = SecureStorage.getEncryptedAccounts();
+    return secureAccounts.map(acc => ({
+      ...acc,
+      privateKey: undefined,
+    } as Account));
+  } catch (error) {
+    console.error('Failed to load accounts from secure storage:', error);
+    return [];
+  }
+};
+
+// Create initial state with defensive defaults
+const createInitialState = (): WalletState => {
+  const networks = initialNetworks;
+  const defaultNetwork = networks.find(n => n.id === 'custom') || networks[0];
+  
+  return {
+    accounts: [], // Start with empty accounts, will be loaded later
+    selectedAccount: null,
+    transactions: [],
+    networks: networks,
+    selectedNetwork: defaultNetwork,
+    isLoading: false,
+    error: null,
+  };
+};
+
+const initialState: WalletState = createInitialState();
 
 export const fetchBalance = createAsyncThunk(
   'wallet/fetchBalance',
@@ -220,9 +296,30 @@ const walletSlice = createSlice({
         if (state.selectedNetwork.id === action.payload.id) {
           state.selectedNetwork = action.payload;
         }
+      }
+      // Save to localStorage
+      saveNetworks(state.networks);
+    },
+    addNetwork: (state, action: PayloadAction<Network>) => {
+      // Generate a unique ID for the new network
+      const timestamp = Date.now();
+      const newNetwork = {
+        ...action.payload,
+        id: `custom-${timestamp}`
+      };
+      state.networks.push(newNetwork);
+      // Save to localStorage
+      saveNetworks(state.networks);
+    },
+    loadNetworksFromStorage: (state) => {
+      const loadedNetworks = loadNetworks();
+      state.networks = loadedNetworks;
+      // Update selected network if it exists in loaded networks
+      const selectedNetwork = loadedNetworks.find(n => n.id === state.selectedNetwork.id);
+      if (selectedNetwork) {
+        state.selectedNetwork = selectedNetwork;
       } else {
-        // Add new custom network
-        state.networks.push(action.payload);
+        state.selectedNetwork = loadedNetworks.find(n => n.id === 'custom') || loadedNetworks[0];
       }
     },
   },
@@ -234,11 +331,7 @@ const walletSlice = createSlice({
       .addCase(fetchBalance.fulfilled, (state, action) => {
         const account = state.accounts.find(a => a.id === action.payload.accountId);
         if (account) {
-          const previousBalance = account.balance || '0';
-          const newBalance = action.payload.balance;
-          
-          // Update balance
-          account.balance = newBalance;
+          account.balance = action.payload.balance;
         }
         if (state.selectedAccount?.id === action.payload.accountId) {
           state.selectedAccount.balance = action.payload.balance;
@@ -272,6 +365,8 @@ export const {
   addTransaction,
   clearError,
   updateNetwork,
+  addNetwork,
+  loadNetworksFromStorage,
 } = walletSlice.actions;
 
 export default walletSlice.reducer;

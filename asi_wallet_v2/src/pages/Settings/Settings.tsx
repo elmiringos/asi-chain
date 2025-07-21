@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import styled from 'styled-components';
 import { RootState } from 'store';
-import { updateNetwork } from 'store/walletSlice';
+import { updateNetwork, addNetwork } from 'store/walletSlice';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from 'components';
 import { Network } from 'types/wallet';
 import { CustomNetworkConfig } from './CustomNetworkConfig';
@@ -65,13 +65,6 @@ export const Settings: React.FC = () => {
   const { networks, selectedNetwork } = useSelector((state: RootState) => state.wallet);
   const [editingNetwork, setEditingNetwork] = useState<Network | null>(null);
   const [isCustomNetwork, setIsCustomNetwork] = useState(false);
-  const [customNetwork, setCustomNetwork] = useState<Network>({
-    id: 'custom',
-    name: 'Custom Network',
-    url: '',
-    readOnlyUrl: '',
-    adminUrl: ''
-  });
 
   const handleEditNetwork = (network: Network) => {
     setEditingNetwork({ ...network });
@@ -80,14 +73,29 @@ export const Settings: React.FC = () => {
 
   const handleSaveNetwork = () => {
     if (editingNetwork) {
-      dispatch(updateNetwork(editingNetwork));
+      if (isCustomNetwork && !networks.find(n => n.id === editingNetwork.id)) {
+        // Adding a new custom network
+        dispatch(addNetwork(editingNetwork));
+      } else {
+        // Updating an existing network
+        dispatch(updateNetwork(editingNetwork));
+      }
       setEditingNetwork(null);
+      setIsCustomNetwork(false);
     }
   };
 
   const handleAddCustomNetwork = () => {
     setIsCustomNetwork(true);
-    setEditingNetwork(customNetwork);
+    // Create a new empty network object for adding
+    setEditingNetwork({
+      id: '', // Will be assigned by the addNetwork action
+      name: '',
+      url: '',
+      readOnlyUrl: '',
+      adminUrl: '',
+      shardId: 'root'
+    });
   };
 
   const handleCancelEdit = () => {

@@ -6,6 +6,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { store, RootState } from 'store';
 import { checkAuthentication } from 'store/authSlice';
 import { initializeWalletConnect } from 'store/walletConnectSlice';
+import { loadNetworksFromStorage } from 'store/walletSlice';
 import { GlobalStyles } from 'styles/GlobalStyles';
 import { lightTheme, darkTheme } from 'styles/theme';
 import { Layout } from 'components';
@@ -55,6 +56,8 @@ const AppContent: React.FC = () => {
     console.log('[App] Initializing app, checking auth and WalletConnect...');
     dispatch(checkAuthentication());
     dispatch(initializeWalletConnect() as any);
+    // Load networks from localStorage after app initializes
+    dispatch(loadNetworksFromStorage());
   }, [dispatch]);
 
   return (
