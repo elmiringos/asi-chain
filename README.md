@@ -9,11 +9,23 @@ This workspace provides the scripts and configuration to deploy a local ASI-Chai
 
 ## 🚀 Quick Links
 
+### Getting Started
 - **[Quick Start Guide](docs-external/GETTING_STARTED.md)** - Get running in 5 minutes
+- **[Interactive Quick Start](docs/quick-start/index.md)** - Step-by-step interactive guide
+- **[Message Exchange Scenarios](docs/quick-start/messages/index.md)** - Common communication patterns
+- **[Common Errors](docs/quick-start/troubleshooting/index.md)** - Quick troubleshooting reference
+
+### Documentation
 - **[Documentation Index](docs-external/INDEX.md)** - Complete documentation overview
 - **[Architecture Overview](docs-external/ARCHITECTURE.md)** - System design and components
+- **[Network Configuration](docs/network-configuration/index.md)** - Network setup and topology
+- **[Interaction Examples](docs/interaction-examples/index.md)** - Practical usage examples
+
+### Operations & Maintenance
 - **[Troubleshooting Guide](docs-external/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Repository Operations](docs-external/REPO_OPERATIONS_AND_MAINTENANCE.md)** - Git workflow and maintenance
+- **[Validator Setup](docs/node-image/validator/index.md)** - Become a validator node
+- **[Network Access](docs/network-access/index.md)** - RPC endpoints and explorer access
 
 ## 📁 Repository Structure
 
