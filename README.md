@@ -7,6 +7,17 @@
 
 This workspace provides the scripts and configuration to deploy a local ASI-Chain test network.
 
+## 🌐 Testnet Portal
+
+**Comprehensive testnet documentation and developer resources are available at:**
+**https://asi-testnet.singularitynet.io/**
+
+**Developer Portal Access:**
+- **Login:** `website_user`
+- **Password:** `tYfrgWp4D5CyGM8U`
+
+The testnet portal provides detailed documentation, network status, tutorials, and additional developer tools beyond what's available in this workspace.
+
 ## 🚀 Quick Links
 
 ### Getting Started
