@@ -43,6 +43,7 @@ export default defineConfig({
         collapsed: true,
         items: [
           { text: 'Network Configuration Overview', link: '/network-configuration/' },
+          { text: 'Network Nodes', link: '/network-configuration/network-nodes/' },
           { text: 'Network Parameters', link: '/network-configuration/parameters/' },
           { text: 'Network Topology', link: '/network-configuration/topology/' },
         ]
