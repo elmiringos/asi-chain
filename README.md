@@ -7,27 +7,70 @@
 
 This workspace provides the scripts and configuration to deploy a local ASI-Chain test network.
 
+## 🌐 Testnet Portal
+
+**Comprehensive testnet documentation and developer resources are available at:**
+**https://asi-testnet.singularitynet.io/**
+
+**Developer Portal Access:**
+- **Login:** `website_user`
+- **Password:** `tYfrgWp4D5CyGM8U`
+
+The testnet portal provides detailed documentation, network status, tutorials, and additional developer tools beyond what's available in this workspace.
+
 ## 🚀 Quick Links
 
-- **[Quick Start Guide](docs/GETTING_STARTED.md)** - Get running in 5 minutes
-- **[Documentation Index](docs/INDEX.md)** - Complete documentation overview
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and components
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-- **[Repository Operations](docs/REPO_OPERATIONS_AND_MAINTENANCE.md)** - Git workflow and maintenance
+### Getting Started
+- **[Quick Start Guide](docs-external/GETTING_STARTED.md)** - Get running in 5 minutes
+- **[Interactive Quick Start](docs/quick-start/index.md)** - Step-by-step interactive guide
+- **[ASI Wallet](http://184.73.0.34:3000)** - Access the ASI:Chain wallet for managing your tokens and transactions
+- **[Message Exchange Scenarios](docs/quick-start/messages/index.md)** - Common communication patterns
+- **[Common Errors](docs/quick-start/troubleshooting/index.md)** - Quick troubleshooting reference
+
+### Documentation
+- **[Documentation Index](docs-external/INDEX.md)** - Complete documentation overview
+- **[Architecture Overview](docs-external/ARCHITECTURE.md)** - System design and components
+- **[Network Configuration](docs/network-configuration/index.md)** - Network setup and topology
+- **[Interaction Examples](docs/interaction-examples/index.md)** - Practical usage examples
+
+### Operations & Maintenance
+- **[Troubleshooting Guide](docs-external/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Repository Operations](docs-external/REPO_OPERATIONS_AND_MAINTENANCE.md)** - Git workflow and maintenance
+- **[Validator Setup](docs/node-image/validator/index.md)** - Become a validator node
+- **[Network Access](docs/network-access/index.md)** - RPC endpoints and explorer access
 
 ## 📁 Repository Structure
 
 The workspace is organized into the following directories:
 
--   **`asi_wallet_v2/`**: Modern React-based cryptocurrency wallet with WalletConnect support. See [Wallet Documentation](docs/WALLET.md).
--   **`block-explorer/`**: Python-based blockchain explorer with web interface (Docker supported). See [Explorer Documentation](docs/BLOCK_EXPLORER.md).
+### Core Components
+-   **`asi_wallet_v2/`**: Modern React-based cryptocurrency wallet with WalletConnect support. See [Wallet Documentation](docs-external/WALLET.md).
+-   **`block-explorer/`**: Python-based blockchain explorer with web interface (Docker supported). See [Explorer Documentation](docs-external/BLOCK_EXPLORER.md).
+-   **`chain/`**: ASI Chain configuration and setup files
+    - **`conf/`**: Node configuration files
+    - **`.env.example`**: Example environment variables configuration
+    - **[`Become-ASI-Chain-Validator.md`](chain/Become-ASI-Chain-Validator.md)**: Guide for becoming a validator on the ASI Chain
+    - **[`How-We-Launch.md`](chain/How-We-Launch.md)**: Detailed launch process documentation
+    - **`README.md`**: Chain-specific documentation
+    - **`testnet-wallets.txt`**: List of testnet wallet addresses
+    - **`validator.yml`**: Validator configuration template
 -   **`contracts/`**: Contains sample Rholang smart contracts.
--   **`docs/`**: Contains all project documentation. See [Documentation Index](docs/INDEX.md).
 -   **`finalizer-bot/`**: Contains the Python-based automated finalizer bot and Docker configuration.
 -   **`logs/`**: Contains log files from test runs.
 -   **`patches/`**: Contains Git patches for fixing upstream issues, particularly the VABN CLI patch.
 -   **`scripts/`**: Contains deployment and utility scripts (`deploy.sh`, `docker-flush.sh`).
 
+### Documentation
+-   **`docs-external/`**: Contains all project documentation. See [Documentation Index](docs-external/INDEX.md).
+-   **`docs/`**: VitePress documentation site source files
+    - **[`quick-start/`](docs/quick-start/index.md)**: Getting started guides, message exchange scenarios, and troubleshooting common errors
+    - **[`node-image/`](docs/node-image/index.md)**: Node image source information and validator node setup instructions
+    - **[`yaml-configuration/`](docs/yaml-configuration/index.md)**: YAML configuration file documentation, parameters, and examples
+    - **[`network-access/`](docs/network-access/index.md)**: Explorer and RPC endpoint information, RNode address generation guides
+    - **[`network-configuration/`](docs/network-configuration/index.md)**: Network configuration overview, parameters, and topology documentation
+    - **[`interaction-examples/`](docs/interaction-examples/index.md)**: Practical examples including smart contracts, block history viewing, and balance checking
+
+### Generated Directories
 The `deploy.sh` script will automatically clone the required external repositories:
 - **`node/`**: F1R3FLY Scala node from https://github.com/F1R3FLY-io/f1r3fly/
 - **`cli/`**: F1R3FLY Rust CLI from https://github.com/F1R3FLY-io/f1r3fly/ (branch: preston/rholang_rust)
@@ -36,7 +79,7 @@ The script also applies the VABN patch from `patches/cli-vabn-support.patch` for
 
 ## Automated Finalizer Bot
 
-To ensure continuous block production and network finalization, the testnet includes an automated **[Finalizer Bot](docs/FINALIZER_BOT.md)**. This bot is a Python script that runs in its own Docker container (`finalizer-bot`) and performs the following cycle every 2 seconds:
+To ensure continuous block production and network finalization, the testnet includes an automated **[Finalizer Bot](docs-external/FINALIZER_BOT.md)**. This bot is a Python script that runs in its own Docker container (`finalizer-bot`) and performs the following cycle every 2 seconds:
 
 1.  **Queries** the current block number from the observer node.
 2.  **Iterates** through all validators including bootstrap (`rnode.bootstrap`, `rnode.validator1`, `rnode.validator2`, `rnode.validator3`).
@@ -313,28 +356,28 @@ For testing the network functionality:
 
 ### 5.2. Documentation
 
-The project includes comprehensive documentation in the `docs/` directory. Start with the [Documentation Index](docs/INDEX.md) for easy navigation.
+The project includes comprehensive documentation in the `docs-external/` directory. Start with the [Documentation Index](docs-external/INDEX.md) for easy navigation.
 
 #### Essential Documentation
--   **[Getting Started Guide](docs/GETTING_STARTED.md)**: Get running in 5 minutes
--   **[Architecture Overview](docs/ARCHITECTURE.md)**: System design, components, and data flow diagrams
--   **[Getting Started Guide](docs/GETTING_STARTED.md#cli-tutorial)**: Comprehensive guide for the `node-cli` tool
--   **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Solutions for common issues
+-   **[Getting Started Guide](docs-external/GETTING_STARTED.md)**: Get running in 5 minutes
+-   **[Architecture Overview](docs-external/ARCHITECTURE.md)**: System design, components, and data flow diagrams
+-   **[Getting Started Guide](docs-external/GETTING_STARTED.md#cli-tutorial)**: Comprehensive guide for the `node-cli` tool
+-   **[Troubleshooting Guide](docs-external/TROUBLESHOOTING.md)**: Solutions for common issues
 
 #### Development & Operations
--   **[Documentation Index](docs/INDEX.md)**: Overview of all available documentation
--   **[Repository Operations](docs/REPO_OPERATIONS_AND_MAINTENANCE.md)**: Git workflow and CI/CD processes
--   **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Solutions and known limitations
+-   **[Documentation Index](docs-external/INDEX.md)**: Overview of all available documentation
+-   **[Repository Operations](docs-external/REPO_OPERATIONS_AND_MAINTENANCE.md)**: Git workflow and CI/CD processes
+-   **[Troubleshooting Guide](docs-external/TROUBLESHOOTING.md)**: Solutions and known limitations
 
 #### Technical Analysis
--   **[Finalizer Bot](docs/FINALIZER_BOT.md)**: Automated block production solution
--   **[Block Explorer](docs/BLOCK_EXPLORER.md)**: Real-time blockchain monitoring
--   **[Wallet Guide](docs/WALLET.md)**: ASI Wallet v2 documentation
+-   **[Finalizer Bot](docs-external/FINALIZER_BOT.md)**: Automated block production solution
+-   **[Block Explorer](docs-external/BLOCK_EXPLORER.md)**: Real-time blockchain monitoring
+-   **[Wallet Guide](docs-external/WALLET.md)**: ASI Wallet v2 documentation
 
 #### Deprecated Documentation
--   **[Architecture Overview](docs/ARCHITECTURE.md)**: System design and data flow
+-   **[Architecture Overview](docs-external/ARCHITECTURE.md)**: System design and data flow
 
-For a complete overview of all documentation, see the [Documentation Index](docs/INDEX.md).
+For a complete overview of all documentation, see the [Documentation Index](docs-external/INDEX.md).
 
 ## 6. Additional Tools
 
@@ -353,7 +396,7 @@ A modern, secure cryptocurrency wallet for the ASI Chain:
 - **LocalStorage Integration**: Automatic synchronization between Redux store and browser storage
 - **Build Optimization**: Excluded test files from production builds for smaller bundle size
 
-See the [Wallet Documentation](docs/WALLET.md) for usage instructions and installation guide.
+See the [Wallet Documentation](docs-external/WALLET.md) for usage instructions and installation guide.
 
 ### Block Explorer
 
@@ -386,7 +429,7 @@ python parser/enhanced_parser.py &  # Start the parser
 python web/app.py                   # Start the web server (http://localhost:8080)
 ```
 
-See the [Block Explorer Documentation](docs/BLOCK_EXPLORER.md) for more information.
+See the [Block Explorer Documentation](docs-external/BLOCK_EXPLORER.md) for more information.
 
 ## 7. Troubleshooting
 
@@ -464,13 +507,13 @@ See the [Block Explorer Documentation](docs/BLOCK_EXPLORER.md) for more informat
 - **Status**: ✅ Fully resolved with patched CLI
 - **Details**: 
   - Patch implementation in `patches/cli-vabn-support.patch`
-  - Solution details in [Finalizer Bot Documentation](docs/FINALIZER_BOT.md)
+  - Solution details in [Finalizer Bot Documentation](docs-external/FINALIZER_BOT.md)
 
 ### Getting Help
 
 If you encounter issues not covered here:
-1. Check the detailed [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
-2. Review the [Troubleshooting Guide](docs/TROUBLESHOOTING.md) for known limitations
+1. Check the detailed [Troubleshooting Guide](docs-external/TROUBLESHOOTING.md)
+2. Review the [Troubleshooting Guide](docs-external/TROUBLESHOOTING.md) for known limitations
 3. Check container logs: `docker logs <container-name>`
 4. Open an issue on GitHub with:
    - Error messages
@@ -481,7 +524,7 @@ If you encounter issues not covered here:
 
 **Current Version**: Pre-Alpha Testnet v1.1 (July 2025)
 
-See the [Documentation Index](docs/INDEX.md) for detailed information about the project status and available features.
+See the [Documentation Index](docs-external/INDEX.md) for detailed information about the project status and available features.
 
 ### Key Working Features
 - ✅ Automated deployment with `deploy.sh`
