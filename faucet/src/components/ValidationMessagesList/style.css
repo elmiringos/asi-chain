@@ -1,0 +1,7 @@
+.validation-messages-block {
+    list-style: none;
+}
+
+.validation-message {
+    color: var(--error-color);
+}
