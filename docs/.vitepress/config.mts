@@ -23,6 +23,13 @@ export default defineConfig({
         ]
       },
       {
+        text: 'Wallet',
+        collapsed: true,
+        items: [
+          { text: 'ASI:Chain Wallet Overview', link: '/wallet/' },
+        ]
+      },
+      {
         text: 'YAML Configuration',
         collapsed: true,
         items: [
