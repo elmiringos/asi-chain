@@ -26,7 +26,7 @@ SHARD_HOST=$(echo $BOOTSTRAP | cut -d"@" -f2 | cut -d"?" -f1)
 echo "Shard Host: $SHARD_HOST"
 
 # Check Wallet balance and top up from faucet if needed
-BALANCE=$(curl -s $FAUCET_API_URL/api/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
+BALANCE=$(curl -s $FAUCET_API_URL/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
 LIMIT_I=$FAUCET_REQUEST_LIMIT
 while [[ "$BALANCE" -lt "$STAKE" && $LIMIT_I -gt 0 ]]; do
   echo "Wallet Balance $BALANCE is not enough to stake $STAKE"
@@ -34,7 +34,7 @@ while [[ "$BALANCE" -lt "$STAKE" && $LIMIT_I -gt 0 ]]; do
   ((LIMIT_I--))
   REQUEST_HEADERS="Content-Type: application/json"
   REQUEST_BODY="{\"to_address\": \"$VALIDATOR_ADDRESS\"}"
-  RESPONSE=$(curl -s -X POST $FAUCET_API_URL/api/transfer -H "$REQUEST_HEADERS" -d "$REQUEST_BODY")
+  RESPONSE=$(curl -s -X POST $FAUCET_API_URL/transfer -H "$REQUEST_HEADERS" -d "$REQUEST_BODY")
   DEPLOY_ID=$(echo "$RESPONSE" | jq '.["deploy_id"]')
   if [[ "$DEPLOY_ID" == "null" ]]; then
     RESPONSE_ERROR=$(echo "$RESPONSE" | jq '.["error"]')
@@ -42,13 +42,13 @@ while [[ "$BALANCE" -lt "$STAKE" && $LIMIT_I -gt 0 ]]; do
     echo "Faucet responded with error: $RESPONSE_ERROR ($RESPONSE_DETAILS)"
   else
     echo "Request succeed, deploy id $DEPLOY_ID"
-    BALANCE_=$(curl -s $FAUCET_API_URL/api/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
+    BALANCE_=$(curl -s $FAUCET_API_URL/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
     LIMIT_J=$BALANCE_REQUEST_LIMIT
     while [[ "$BALANCE" -eq "$BALANCE_" && $LIMIT_J -gt 0 ]]; do
       echo "Waiting Wallet Balance update ($LIMIT_J)..."
       ((LIMIT_J--))
       sleep $BALANCE_REQUEST_DELAY
-      BALANCE_=$(curl -s $FAUCET_API_URL/api/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
+      BALANCE_=$(curl -s $FAUCET_API_URL/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
     done
     if [[ "$BALANCE" -eq "$BALANCE_" ]]; then
       echo "Unable to update balance"
