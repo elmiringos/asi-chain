@@ -1,7 +1,7 @@
 
 services:
   connector:
-    image: connector:latest
+    image: 533793137436.dkr.ecr.us-east-1.amazonaws.com/asi-chain/validator-connector:v0.0.1
     environment:
       - FAUCET_API_URL=https://asi-testnet-faucet.singularitynet.io
       - BOOTSTRAP_PUBLIC_GRPC_PORT=40401

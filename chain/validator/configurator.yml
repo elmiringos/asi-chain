@@ -1,7 +1,7 @@
 
 services:
   configurator:
-    image: configurator:latest
+    image: 533793137436.dkr.ecr.us-east-1.amazonaws.com/asi-chain/validator-configurator:v0.0.1
     volumes:
       - ./conf:/home/node/conf
       - ./.env:/home/node/.env
