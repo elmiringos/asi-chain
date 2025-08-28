@@ -7,7 +7,7 @@ describe('ASI Wallet - Create → Settings → Import → Transfer → Validate'
   const ACCOUNT_2_NAME = `Test Imported ${Date.now() + 1}`;
   const ACCOUNT_PASSWORD = 'TestPass123!';
   const PRIVATE_KEY = process.env.PRIVATE_KEY;
-  const VALIDATOR_IP = '54.175.6.183';
+  const VALIDATOR_IP = '44.198.8.24';
   const TRANSFER_AMOUNT = '1';
   const FEE_AMOUNT = '0.002';
 
