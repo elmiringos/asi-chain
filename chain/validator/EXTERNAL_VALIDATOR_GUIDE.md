@@ -4,8 +4,6 @@
 
 Follow these instructions to connect an **external validator** to the ASI\:Chain (MettaCycle testnet). The process covers building Docker images, preparing the environment, bonding the validator, running the node, verifying synchronization, testing a manual transaction deploy, and safely stopping the node.
 
-**Note on Location**: This guide resides within the project repository alongside its automation script. All file paths are relative to maintain self-containment and ensure functionality directly from the repository.
-
 ## Requirements
 
 * **Docker** and **docker-compose** installed.
