@@ -8,4 +8,4 @@ COPY ./chain/validator/scripts/configure.sh ./configure.sh
 RUN ["apk", "add", "--no-cache", "curl"]
 RUN ["npm", "--prefix", "wallet-generator", "install"]
 
-CMD ["sh", "configure.sh"]
+ENTRYPOINT ["sh", "configure.sh"]

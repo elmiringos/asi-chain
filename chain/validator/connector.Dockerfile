@@ -12,4 +12,4 @@ WORKDIR /app/rust-client
 RUN ["cargo", "build"]
 WORKDIR /app
 
-CMD ["bash", "connect.sh"]
+ENTRYPOINT ["bash", "connect.sh"]
