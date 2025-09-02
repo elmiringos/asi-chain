@@ -6,9 +6,11 @@ BALANCE_REQUEST_DELAY=1
 VALIDATOR_CHECK_LIMIT=10
 VALIDATOR_CHECK_DELAY=60
 
+cd /app/rust-client
+
 # Get shard host from validator url
 # ! We assume here that shard includes bootstrap, validators and observer on the same host
-SHARD_HOST=$(echo $BOOTSTRAP | cut -d"@" -f2 | cut -d"?" -f1)
+SHARD_HOST=$(echo "$BOOTSTRAP" | cut -d"@" -f2 | cut -d"?" -f1)
 echo "Shard Host: $SHARD_HOST"
 
 # Define function to check validator bonding status
@@ -30,7 +32,7 @@ if is_validator_bonded; then
 fi
 
 # Check Wallet balance and top up from faucet if needed
-BALANCE=$(curl -s $FAUCET_API_URL/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
+BALANCE=$(curl -s "$FAUCET_API_URL/balance/$VALIDATOR_ADDRESS" | jq '.balance | tonumber')
 LIMIT_I=$FAUCET_REQUEST_LIMIT
 while [[ "$BALANCE" -lt "$STAKE" && $LIMIT_I -gt 0 ]]; do
   echo "Wallet Balance $BALANCE is not enough to stake $STAKE"
@@ -38,21 +40,21 @@ while [[ "$BALANCE" -lt "$STAKE" && $LIMIT_I -gt 0 ]]; do
   ((LIMIT_I--))
   REQUEST_HEADERS="Content-Type: application/json"
   REQUEST_BODY="{\"to_address\": \"$VALIDATOR_ADDRESS\"}"
-  RESPONSE=$(curl -s -X POST $FAUCET_API_URL/transfer -H "$REQUEST_HEADERS" -d "$REQUEST_BODY")
-  DEPLOY_ID=$(echo "$RESPONSE" | jq '.["deploy_id"]')
-  if [[ "$DEPLOY_ID" == "null" ]]; then
-    RESPONSE_ERROR=$(echo "$RESPONSE" | jq '.["error"]')
-    RESPONSE_DETAILS=$(echo "$RESPONSE" | jq '.["details"]')
+  RESPONSE=$(curl -s -X POST "$FAUCET_API_URL/transfer" -H "$REQUEST_HEADERS" -d "$REQUEST_BODY")
+  DEPLOY_ID=$(echo "$RESPONSE" | jq '.deploy_id')
+  if [[ -z "$DEPLOY_ID" || "$DEPLOY_ID" == "null" ]]; then
+    RESPONSE_ERROR=$(echo "$RESPONSE" | jq '.error')
+    RESPONSE_DETAILS=$(echo "$RESPONSE" | jq '.details')
     echo "Faucet responded with error: $RESPONSE_ERROR ($RESPONSE_DETAILS)"
   else
     echo "Request succeed, deploy id $DEPLOY_ID"
-    BALANCE_=$(curl -s $FAUCET_API_URL/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
+    BALANCE_=$(curl -s "$FAUCET_API_URL/balance/$VALIDATOR_ADDRESS" | jq '.balance | tonumber')
     LIMIT_J=$BALANCE_REQUEST_LIMIT
     while [[ "$BALANCE" -eq "$BALANCE_" && $LIMIT_J -gt 0 ]]; do
       echo "Waiting Wallet Balance update ($LIMIT_J)..."
       ((LIMIT_J--))
       sleep $BALANCE_REQUEST_DELAY
-      BALANCE_=$(curl -s $FAUCET_API_URL/balance/$VALIDATOR_ADDRESS | jq '.["balance"] | tonumber')
+      BALANCE_=$(curl -s "$FAUCET_API_URL/balance/$VALIDATOR_ADDRESS" | jq '.balance | tonumber')
     done
     if [[ "$BALANCE" -eq "$BALANCE_" ]]; then
       echo "Unable to update balance"
@@ -71,8 +73,6 @@ else
   echo "Number of attempts to top up balance has exceeded the limit, please try manually, exiting..."
   exit 1
 fi
-
-cd /app/rust-client
 
 # Check validator status and bond validator to the shard if needed
 if is_validator_bonded; then
