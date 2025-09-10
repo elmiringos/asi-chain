@@ -6,7 +6,7 @@ Follow these instructions to connect an **external validator** to the ASI:Chain 
 
 ## Requirements
 
-* Docker and docker-compose installed
+* Docker and docker compose installed
 * Rust and Cargo installed (required for the transaction deployment verification)
 * Network access to the testnet endpoints specified in this guide
 
@@ -119,12 +119,12 @@ Execute the configurator:
 
 **Linux/macOS:**
 ```bash
-docker-compose -f ./configurator.yml up
+docker compose -f ./configurator.yml up
 ```
 
 **Windows PowerShell:**
 ```powershell
-docker-compose -f .\configurator.yml up
+docker compose -f .\configurator.yml up
 ```
 
 The configurator:
@@ -144,12 +144,12 @@ The standard deployment runs both bonding and validation with a single command:
 
 **Linux/macOS:**
 ```bash
-docker-compose -f ./validator.yml up -d
+docker compose -f ./validator.yml up -d
 ```
 
 **Windows PowerShell:**
 ```powershell
-docker-compose -f .\validator.yml up -d
+docker compose -f .\validator.yml up -d
 ```
 
 This starts two services:
@@ -164,7 +164,7 @@ If you prefer to bond separately before starting the validator:
 
 **Step 1: Run bonding utility**
 ```bash
-docker-compose -f ./connector.yml up
+docker compose -f ./connector.yml up
 ```
 
 This starts a utility container that sends the bonding transaction to the network.
@@ -175,7 +175,7 @@ The container will exit automatically after successful bonding.
 
 **Step 2: Start validator**
 ```bash
-docker-compose -f ./validator.yml up -d
+docker compose -f ./validator.yml up -d
 ```
 
 ---
@@ -228,12 +228,12 @@ To stop the validator node:
 
 **Linux/macOS:**
 ```bash
-docker-compose -f ./validator.yml stop
+docker compose -f ./validator.yml stop
 ```
 
 **Windows PowerShell:**
 ```powershell
-docker-compose -f .\validator.yml stop
+docker compose -f .\validator.yml stop
 ```
 
 This stops the container without deleting it, preserving state for future restarts.
