@@ -4,8 +4,9 @@ import styled from 'styled-components';
 import { RootState } from 'store';
 import { selectAccount, removeAccount, syncAccounts, fetchBalance } from 'store/walletSlice';
 import { createAccountWithPassword, importAccountWithPassword, exportAccountKeyfile } from 'store/authSlice';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input } from 'components';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, PrivateKeyDisplay } from 'components';
 import { PasswordSetup } from 'components/PasswordSetup';
+import { SecureStorage } from 'services/secureStorage';
 
 const AccountsContainer = styled.div`
   max-width: 800px;
@@ -118,7 +119,9 @@ export const Accounts: React.FC = () => {
 
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [showImportPassword, setShowImportPassword] = useState(false);
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [pendingAccountName, setPendingAccountName] = useState('');
+  const [pendingPrivateKey, setPendingPrivateKey] = useState('');
   const [pendingImport, setPendingImport] = useState<{
     name: string;
     value: string;
@@ -130,14 +133,12 @@ export const Accounts: React.FC = () => {
   const [importValue, setImportValue] = useState('');
   const [importType, setImportType] = useState<'private' | 'public' | 'eth' | 'rev'>('private');
 
-  // Sync unlocked accounts to wallet state
   useEffect(() => {
     if (unlockedAccounts.length > 0) {
       dispatch(syncAccounts(unlockedAccounts));
     }
   }, [unlockedAccounts, dispatch]);
 
-  // Fetch balances for all accounts when component mounts or accounts/network changes
   useEffect(() => {
     if (accounts.length > 0 && selectedNetwork) {
       accounts.forEach(account => {
@@ -146,15 +147,13 @@ export const Accounts: React.FC = () => {
     }
   }, [accounts, selectedNetwork, dispatch]);
 
-  // Auto-refresh balances every 30 seconds
   useEffect(() => {
     if (accounts.length > 0 && selectedNetwork) {
       const interval = setInterval(() => {
         accounts.forEach(account => {
           dispatch(fetchBalance({ account, network: selectedNetwork }) as any);
         });
-      }, 30000); // 30 seconds
-
+      }, 30000); 
       return () => clearInterval(interval);
     }
   }, [accounts, selectedNetwork, dispatch]);
@@ -182,13 +181,10 @@ export const Accounts: React.FC = () => {
       }) as any);
       
       if (createAccountWithPassword.fulfilled.match(resultAction)) {
-        // Sync the new account to wallet state
-        dispatch(syncAccounts([resultAction.payload.account]));
+        setPendingPrivateKey(resultAction.payload.account.privateKey || '');
+        setShowPasswordSetup(false);
+        setShowPrivateKey(true);
       }
-      
-      setNewAccountName('');
-      setPendingAccountName('');
-      setShowPasswordSetup(false);
     } else if (pendingImport) {
       const resultAction = await dispatch(importAccountWithPassword({
         ...pendingImport,
@@ -196,7 +192,6 @@ export const Accounts: React.FC = () => {
       }) as any);
       
       if (importAccountWithPassword.fulfilled.match(resultAction)) {
-        // Sync the new account to wallet state
         dispatch(syncAccounts([resultAction.payload.account]));
       }
       
@@ -207,9 +202,20 @@ export const Accounts: React.FC = () => {
     }
   };
 
+  const handlePrivateKeyAcknowledged = () => {
+    dispatch(syncAccounts(SecureStorage.getEncryptedAccounts().map(acc => ({
+      ...acc,
+      privateKey: undefined, 
+    }))));
+    
+    setNewAccountName('');
+    setPendingAccountName('');
+    setPendingPrivateKey('');
+    setShowPrivateKey(false);
+  };
+
   const handleImportAccount = () => {
     if (importName.trim() && importValue.trim()) {
-      // Only private key imports need password
       if (importType === 'private') {
         setPendingImport({
           name: importName.trim(),
@@ -218,12 +224,11 @@ export const Accounts: React.FC = () => {
         });
         setShowImportPassword(true);
       } else {
-        // For other types, we can't encrypt without private key
         dispatch(importAccountWithPassword({
           name: importName.trim(),
           value: importValue.trim(),
           type: importType,
-          password: '' // No password needed for watch-only accounts
+          password: '' 
         }) as any).then((resultAction: any) => {
           if (importAccountWithPassword.fulfilled.match(resultAction)) {
             // Sync the new account to wallet state
@@ -284,6 +289,23 @@ export const Accounts: React.FC = () => {
             />
           </CardContent>
         </Card>
+      </AccountsContainer>
+    );
+  }
+
+  if (showPrivateKey) {
+    return (
+      <AccountsContainer>
+        <PrivateKeyDisplay
+          privateKey={pendingPrivateKey}
+          accountName={pendingAccountName}
+          onContinue={handlePrivateKeyAcknowledged}
+          onBack={() => {
+            setShowPrivateKey(false);
+            setShowPasswordSetup(true);
+          }}
+          showBackButton={true}
+        />
       </AccountsContainer>
     );
   }
