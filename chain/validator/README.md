@@ -1,4 +1,4 @@
-# ASI:Chain (MettaCycle Testnet) — External Validator Setup Guide
+# ASI:Chain DevNet — External Validator Setup Guide
 
 ## Introduction
 
@@ -301,6 +301,6 @@ The validator uses the following ports:
 
 ### Network Endpoints
 
-- **Observer API:** http://44.198.8.24:40453/api/last-finalized-block
-- **Faucet:** https://asi-testnet-faucet.singularitynet.io/api
-- **Repository:** [ASI Chain - External Validator](https://github.com/asi-alliance/asi-chain/tree/external-validator/chain/validator)
+- **Observer API:** http://54.152.57.201:40453/api/last-finalized-block
+- **Faucet:** https://ffyp8igwwc.execute-api.us-east-1.amazonaws.com
+- **Repository:** [ASI Chain - External Validator](https://github.com/asi-alliance/asi-chain/chain/validator)

@@ -1,3 +1,7 @@
+
+> [!WARNING]
+> OUTDATED DOCS
+
 # ASI:Chain - How you can connect to chain?
 
 This instruction describes how you will be able to connect to the ASI:Chain and become a validator with our prepared wallets' keys.
