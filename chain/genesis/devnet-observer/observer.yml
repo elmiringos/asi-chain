@@ -1,0 +1,34 @@
+services:
+  readonly:
+    image: amamata/asi-scala-node:latest
+    user: root
+    networks:
+      - devnet
+    container_name: observer
+    command:
+    - run
+    - --host=54.235.138.68
+    - --protocol-port=40400
+    - --discovery-port=40404
+    - --api-port-http=40403
+    - --api-port-grpc-external=40401
+    - --api-port-grpc-internal=40402
+    - --api-port-admin-http=40405
+    - --network-id=devnet
+    # 54.152.57.201 - bootstrap | devnet server1
+    - --bootstrap=rnode://e5e6faf012f36a30176d459ddc0db81435f6f1dc@54.152.57.201?protocol=40400&discovery=40404
+    ports:
+      - "40400:40400"
+      - "40401:40401"
+      - "40402:40402"
+      - "40403:40403"
+      - "40404:40404"
+      - "40405:40405"
+    volumes:
+      - ./conf/logback.xml:/var/lib/rnode/logback.xml
+
+
+networks:
+  devnet:
+    external: true
+    name: devnet
