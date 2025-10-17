@@ -17,8 +17,8 @@ mkdir -p logs
 LOGFILE="logs/bot_report_$(date +%F_%H-%M).log"
 
 
-echo "Bot started..."
-echo "Logs streaming to $LOGFILE"
+echo "[$(date +"%Y-%m-%d %H:%M:%S")] Bot started..."
+echo "[$(date +"%Y-%m-%d %H:%M:%S")] Logs streaming to $LOGFILE"
 echo ""
 
 while true; do
@@ -39,9 +39,9 @@ while true; do
     [[ $deploy_out == *$'\n' ]] || printf '\n' | tee -a "$LOGFILE"
 
     if [ $deploy_status -eq 0 ]; then
-      echo -e "${GREEN}[SUCCESS] deploy on $node${NC}" | tee -a "$LOGFILE"
+      echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] ${GREEN}[SUCCESS] deploy on $node${NC}" | tee -a "$LOGFILE"
     else
-      echo -e "${RED}[ERROR] deploy on $node${NC}"  | tee -a "$LOGFILE"
+      echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] ${RED}[ERROR] deploy on $node${NC}"  | tee -a "$LOGFILE"
     fi
 
     echo
@@ -58,9 +58,9 @@ while true; do
     [[ $propose_out == *$'\n' ]] || printf '\n' | tee -a "$LOGFILE"
 
     if [ $propose_status -eq 0 ]; then
-      echo -e "${GREEN}[SUCCESS] propose on $node${NC}" | tee -a "$LOGFILE"
+      echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] ${GREEN}[SUCCESS] propose on $node${NC}" | tee -a "$LOGFILE"
     else
-      echo -e "${RED}[ERROR] propose on $node${NC}"  | tee -a "$LOGFILE"
+      echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] ${RED}[ERROR] propose on $node${NC}"  | tee -a "$LOGFILE"
     fi
 
     echo
