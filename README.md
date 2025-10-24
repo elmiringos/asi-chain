@@ -77,18 +77,6 @@ The `deploy.sh` script will automatically clone the required external repositori
 
 The script also applies the VABN patch from `patches/cli-vabn-support.patch` for block 50 compatibility and configures the network during the setup process.
 
-## Automated Finalizer Bot
-
-To ensure continuous block production and network finalization, the testnet includes an automated **[Finalizer Bot](docs-external/FINALIZER_BOT.md)**. This bot is a Python script that runs in its own Docker container (`finalizer-bot`) and performs the following cycle every 2 seconds:
-
-1.  **Queries** the current block number from the observer node.
-2.  **Iterates** through all validators including bootstrap (`rnode.bootstrap`, `rnode.validator1`, `rnode.validator2`, `rnode.validator3`).
-3.  **Deploys** a unique Rholang contract with `validAfterBlockNumber` set to the current block.
-4.  **Proposes** a new block on that same validator.
-5.  **Monitors** block progression, especially past block 50.
-
-**Solution to Block 50 Issue**: The finalizer bot uses the patched CLI's `--valid-after-block-number` flag to ensure deploys remain valid beyond block 50. Each deploy is valid for 50 blocks from its creation, allowing indefinite network operation.
-
 ### Race Condition and Resolution
 
 A significant challenge during development was a race condition where the `finalizer-bot` container would start and attempt to communicate with the validator nodes before they were fully initialized. This resulted in two primary errors:
@@ -370,7 +358,6 @@ The project includes comprehensive documentation in the `docs-external/` directo
 -   **[Troubleshooting Guide](docs-external/TROUBLESHOOTING.md)**: Solutions and known limitations
 
 #### Technical Analysis
--   **[Finalizer Bot](docs-external/FINALIZER_BOT.md)**: Automated block production solution
 -   **[Block Explorer](docs-external/BLOCK_EXPLORER.md)**: Real-time blockchain monitoring
 -   **[Wallet Guide](docs-external/WALLET.md)**: ASI Wallet v2 documentation
 
@@ -507,7 +494,6 @@ See the [Block Explorer Documentation](docs-external/BLOCK_EXPLORER.md) for more
 - **Status**: ✅ Fully resolved with patched CLI
 - **Details**: 
   - Patch implementation in `patches/cli-vabn-support.patch`
-  - Solution details in [Finalizer Bot Documentation](docs-external/FINALIZER_BOT.md)
 
 ### Getting Help
 

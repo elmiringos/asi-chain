@@ -57,7 +57,6 @@ docs/
 ## 🔧 Operations
 
 ### Deployment & Maintenance
-- **[Finalizer Bot](FINALIZER_BOT.md)** - Automated block production system
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Deployment Fixes](TROUBLESHOOTING.md#deployment-issues)** - Recent deployment fixes
 
@@ -80,7 +79,6 @@ docs/
 
 ### Consensus & Features
 - **[Architecture Overview](ARCHITECTURE.md#consensus)** - Understanding consensus and block proposals
-- **[Finalizer Bot](FINALIZER_BOT.md)** - Automated block production system
 
 ## 📋 Quick Reference
 
@@ -163,7 +161,6 @@ Check:
 1. [Repository Operations](REPO_OPERATIONS_AND_MAINTENANCE.md)
 2. [Wallet Deployment](WALLET.md#deployment)
 3. [Troubleshooting](TROUBLESHOOTING.md)
-4. [Finalizer Bot](FINALIZER_BOT.md)
 
 ## 📝 Documentation Meta
 
