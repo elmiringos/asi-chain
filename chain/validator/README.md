@@ -1,8 +1,14 @@
-# ASI:Chain DevNet — External Validator Setup Guide
+# ASI Chain: External Validator Setup
+
+← [Back to Chain README](../README.md) | [Configuration Guide](../../CONFIGURATION.md) | [Development Guide](../../DEVELOPMENT.md)
+
+This guide provides complete instructions for deploying an external validator node to the ASI Chain network.
+
+---
 
 ## Introduction
 
-Follow these instructions to connect an **external validator** to the ASI:Chain (MettaCycle testnet). The process covers building Docker images, preparing the environment, bonding the validator, running the node, verifying synchronization, testing a manual transaction deploy, and safely stopping the node.
+Follow these instructions to connect an external validator to the ASI Chain network. The process covers building Docker images, preparing the environment, bonding the validator, running the node, verifying synchronization, testing transaction deployment, and safely stopping the node.
 
 ## Requirements
 
