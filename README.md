@@ -32,7 +32,7 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 
 ## Overview
 
-ASI Chain is a blockchain platform built on F1R3FLY technology, providing infrastructure for the ASI Alliance ecosystem. This repository contains the node configuration, deployment automation, and utilities needed to run and interact with the ASI Chain network.
+ASI Chain is a blockchain platform providing infrastructure for the ASI Alliance ecosystem. This repository contains the node configuration, deployment automation, and utilities needed to run and interact with the ASI Chain network.
 
 The platform uses the CBC Casper consensus mechanism with Proof of Stake, enabling validators to participate in block production and network security. Smart contracts are written in Rholang, a concurrent programming language designed for blockchain applications.
 
