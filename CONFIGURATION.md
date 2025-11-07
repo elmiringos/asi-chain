@@ -169,14 +169,14 @@ Validator nodes use the following port configuration:
 
 All nodes operate within a Docker network:
 
-**Network Name:** `docker_f1r3fly`
+**Network Name:** `devnet`
 
 **Configuration:**
 ```yaml
 networks:
-  f1r3fly:
+  devnet:
     external: false
-    name: docker_f1r3fly
+    name: devnet
 ```
 
 **Purpose:** Isolates node communication while allowing external access through mapped ports
@@ -190,7 +190,7 @@ networks:
 Docker Compose file: `chain/validator/validator.yml`
 
 **Image:**
-- Source: `amamata/snet-scala-node:optimized`
+- Source: `amamata/asi-scala-node:latest`
 - Platform: Linux/amd64
 - Base: OpenJDK 17
 

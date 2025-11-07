@@ -215,7 +215,7 @@ Verify your validator can submit transactions to the network:
 
 1. **Clone the Rust client:**
 ```bash
-git clone https://github.com/F1R3FLY-io/rust-client
+git clone https://github.com/singnet/rust-client
 cd rust-client
 ```
 

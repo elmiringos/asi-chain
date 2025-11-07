@@ -162,7 +162,7 @@ The `--recursive` flag initializes the `node/` submodule. If you already cloned 
 git submodule update --init --recursive
 ```
 
-### Build F1R3FLY Node
+### Build ASI Chain Node
 
 To build manually:
 
@@ -173,7 +173,7 @@ sbt "project node" Docker/publishLocal
 cd ..
 ```
 
-This creates the Docker image `f1r3flyindustries/f1r3fly-scala-node:latest`.
+This creates the Docker image `amamata/asi-scala-node:latest`.
 
 ### Build Rust CLI
 
@@ -209,14 +209,15 @@ cd ..
 
 **Note:** Automated deployment scripts (including `scripts/deploy.sh`) are currently in development and reference components not included in this repository. The manual deployment steps below provide a working setup without external dependencies.
 
-### Step 1: Clone Dependencies
+### Step 1: Initialize Dependencies
 
 ```bash
-# Clone node repository (if not using submodule)
-git clone https://github.com/singnet/f1r3fly-node.git node
+# Initialize submodules (node repository)
+git submodule update --init --recursive
 
 # Clone CLI repository
-git clone -b preston/rholang_rust https://github.com/F1R3FLY-io/f1r3fly cli
+git clone https://github.com/singnet/rust-client cli
+cd cli
 ```
 
 ### Step 2: Build Components
@@ -417,7 +418,7 @@ docker logs rnode.bootstrap
 
 Check network connectivity:
 ```bash
-docker network inspect docker_f1r3fly
+docker network inspect devnet
 ```
 
 **Transaction not processing**

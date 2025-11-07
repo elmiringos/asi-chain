@@ -88,14 +88,14 @@ System requirements: 16GB RAM minimum, 4+ CPU cores, 50GB free storage
 git clone --recursive https://github.com/asi-alliance/asi-chain.git
 cd asi-chain
 
-# Initialize submodule (F1R3FLY node)
+# Initialize submodule (ASI Chain node)
 git submodule update --init --recursive
 ```
 
 **Note:** Automated deployment scripts are planned for future releases. Currently, use manual deployment steps outlined in [DEVELOPMENT.md](DEVELOPMENT.md#manual-deployment).
 
 **Manual deployment requires:**
-1. Building F1R3FLY node Docker image from `node/` submodule
+1. Building ASI Chain node Docker image from `node/` submodule
 2. Building Rust CLI from external repository
 3. Configuring and starting network services
 4. Verifying network operational status
@@ -158,7 +158,7 @@ The DevNet consists of multiple node types working in coordination:
 ### Technology Stack
 
 **Core Infrastructure:**
-- F1R3FLY Node (Scala) - Blockchain node implementation based on RChain
+- ASI Chain Node (Scala) - Blockchain node implementation based on RChain
 - Rust Client (CLI) - Command-line interface for node interaction
 - Docker - Containerization platform
 
@@ -181,7 +181,7 @@ The DevNet consists of multiple node types working in coordination:
 
 ```
 asi-chain/
-├── node/                      # F1R3FLY node (Git submodule)
+├── node/                      # ASI Chain node (Git submodule)
 │   └── docker/               # Node Docker configurations
 │
 ├── chain/                     # Node configurations
@@ -219,7 +219,7 @@ asi-chain/
 └── README.md                  # This file
 ```
 
-**Note:** The `node/` directory is a Git submodule pointing to https://github.com/singnet/f1r3fly-node.git (branch: ticker_rename_applied). Initialize it with `git submodule update --init --recursive`.
+**Note:** The `node/` directory is a Git submodule pointing to https://github.com/singnet/f1r3fly-node.git. Initialize it with `git submodule update --init --recursive`.
 
 ---
 
