@@ -182,7 +182,7 @@ docker compose -f ./validator.yml up -d
 
 1. **Check the observer's latest finalized block:**
    ```
-   http://54.235.138.68:40402/api/last-finalized-block
+   http://54.235.138.68:40403/api/last-finalized-block
    ```
    If the response contains at least one block, the network is operational.
 
@@ -298,6 +298,6 @@ The validator uses the following ports:
 
 ### Network Endpoints
 
-- **Observer API:** http://54.235.138.68:40402/api/last-finalized-block
+- **Observer API:** http://54.235.138.68:40403/api/last-finalized-block
 - **Faucet:** https://ffyp8igwwc.execute-api.us-east-1.amazonaws.com
 - **Repository:** [ASI Chain - External Validator](https://github.com/asi-alliance/asi-chain/chain/validator)
