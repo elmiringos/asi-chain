@@ -1,0 +1,41 @@
+x-rnode: &default-rnode
+  image: amamata/asi-scala-node:latest
+  user: root
+  networks:
+    - devnet
+
+services:
+  validator3:
+    <<: *default-rnode
+    environment:
+      - JAVA_OPTS=-Xss16m -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+      - SBT_OPTS=-Xmx4g -Xss2m -Dsbt.supershell=false
+    container_name: validator3
+    command:
+      [
+        "run",
+        "--host=$VALIDATOR_HOST",
+        "--bootstrap=rnode://$BOOTSTRAP_NODE_ID@$BOOTSTRAP_HOST?protocol=40400&discovery=40404",
+        "--validator-public-key=$VALIDATOR_PUBLIC_KEY",
+        "--validator-private-key=$VALIDATOR_PRIVATE_KEY"
+      ]
+    ports:
+      - "40430:40430"
+      - "40431:40431"
+      - "40432:40432"
+      - "40433:40433"
+      - "40434:40434"
+      - "40435:40435"
+    volumes:
+      - ./conf/validator3.conf:/var/lib/rnode/rnode.conf
+      - ./genesis/wallets.txt:/var/lib/rnode/genesis/wallets.txt
+      - ./genesis/bonds.txt:/var/lib/rnode/genesis/bonds.txt
+      - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - ./data/validator3:/var/lib/rnode/
+      - ./conf/validator3.certificate.pem:/var/lib/rnode/node.certificate.pem
+      - ./conf/validator3.key.pem:/var/lib/rnode/node.key.pem
+
+networks:
+  devnet:
+    external: false
+    name: devnet

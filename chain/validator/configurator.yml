@@ -1,0 +1,10 @@
+name: validator
+
+services:
+  configurator:
+    image: public.ecr.aws/f6y9h6x4/asi-chain/validator-configurator:latest
+    container_name: validator-configurator-job
+    restart: "no"
+    volumes:
+      - ./conf:/home/node/conf
+      - ./.env:/home/node/.env

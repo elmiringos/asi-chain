@@ -1,0 +1,15 @@
+name: deployer
+
+services:
+  deployer:
+    image: deployer-bot:latest
+    container_name: deployer
+    env_file:
+      - .env
+    networks:
+      - devnet
+
+networks:
+  devnet:
+    external: true
+    name: devnet

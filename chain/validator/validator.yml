@@ -1,0 +1,50 @@
+name: validator
+
+x-rnode: &default-rnode
+  image: public.ecr.aws/f6y9h6x4/asi-chain/node:latest
+  user: root
+  networks:
+    - devnet
+
+services:
+  connector:
+    image: public.ecr.aws/f6y9h6x4/asi-chain/validator-connector:latest
+    container_name: validator-connector-job
+    env_file: .env
+    restart: "no"
+  validator:
+    <<: *default-rnode
+    container_name: validator
+    environment:
+      - JAVA_OPTS=-Xss16m -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+      - SBT_OPTS=-Xmx4g -Xss2m -Dsbt.supershell=false
+    command:
+      [
+        "run",
+        "--host=$VALIDATOR_HOST",
+        "--protocol-port=40440",
+        "--api-port-grpc-external=40441",
+        "--api-port-grpc-internal=40442",
+        "--api-port-http=40443",
+        "--discovery-port=40444",
+        "--api-port-admin-http=40445",
+        "--bootstrap=$BOOTSTRAP",
+        "--validator-public-key=$VALIDATOR_PUBLIC_KEY",
+        "--validator-private-key=$VALIDATOR_PRIVATE_KEY"
+      ]
+    ports:
+      - "40440:40440"
+      - "40441:40441"
+      - "40442:40442"
+      - "40443:40443"
+      - "40444:40444"
+      - "40445:40445"
+    volumes:
+      - ./conf/validator.conf:/var/lib/rnode/rnode.conf
+      - ./conf/logback.xml:/var/lib/rnode/logback.xml
+      - ./data:/var/lib/rnode/
+
+networks:
+  devnet:
+    external: false
+    name: devnet

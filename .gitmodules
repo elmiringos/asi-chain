@@ -1,9 +1,4 @@
 [submodule "node"]
 	path = node
-	url = https://github.com/asi-alliance/asi-f1r3fly-node.git
-	branch = preston/rholang_rust
-
-[submodule "rust-client"]
-	path = faucet/server/rust-client
-	url = https://github.com/singnet/rust-client.git
-	branch = main
+	url = https://github.com/singnet/f1r3fly-node.git
+	branch = ticker_rename_applied
