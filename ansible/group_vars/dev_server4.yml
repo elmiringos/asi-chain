@@ -1,0 +1,10 @@
+# Remove named volumes on docker compose down to ensure fresh state on next up
+compose_down_flags: "-v"
+
+compose_jobs:
+  - name: observer
+    work_dir: ~/observer
+    compose_file: observer.yml
+
+local_containers:
+  - observer

@@ -1,0 +1,55 @@
+---
+# ============================================================
+# ASI-Chain DEV — Stop network
+#
+# What happens:
+#   1. Save container logs to ~/logs/DD-MM/ on each server
+#   2. docker compose down on all nodes + observer
+#
+# Usage:
+#   ansible-playbook -i inventory/dev.ini down-dev.yml
+# ============================================================
+
+
+# ---- Log trail: START --------------------------------------
+- name: "Log trail"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/log_trail.yml
+      vars:
+        trail_operation: DOWN
+        trail_env: DEV
+        trail_status: START
+
+
+# ---- Step 1: stop all nodes --------------------------------
+- name: "Stop all nodes on server-1"
+  hosts: dev_server1
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/stop_nodes.yml
+
+- name: "Stop nodes on server-2"
+  hosts: dev_server2
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/stop_nodes.yml
+
+- name: "Stop observer on server-4"
+  hosts: dev_server4
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/stop_nodes.yml
+
+
+# ---- Log trail: SUCCESS ------------------------------------
+- name: "Log trail"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/log_trail.yml
+      vars:
+        trail_operation: DOWN
+        trail_env: DEV
+        trail_status: SUCCESS

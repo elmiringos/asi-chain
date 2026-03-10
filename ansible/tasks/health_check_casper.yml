@@ -1,0 +1,13 @@
+# Wait until MultiParentCasper is initialized in each container from local_containers.
+# Retries up to casper_check_retries * casper_check_delay seconds (default 5 min).
+---
+- name: "Wait for MultiParentCasper initialization"
+  shell: "docker logs {{ item }} 2>&1 | grep -c 'MultiParentCasper instance created'"
+  register: casper_check
+  until: casper_check.stdout | int > 0
+  retries: "{{ casper_check_retries }}"
+  delay: "{{ casper_check_delay }}"
+  loop: "{{ local_containers }}"
+  loop_control:
+    label: "{{ item }}"
+  changed_when: false

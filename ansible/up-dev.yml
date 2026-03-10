@@ -1,0 +1,100 @@
+---
+# ============================================================
+# ASI-Chain DEV — Start network
+#
+# Topology:
+#   dev_server2  — bootstrap (node0) + validator3 (node3)
+#   dev_server1  — validator1 (node1) + validator2 (node2) via v1-v2.yml
+#   dev_server4  — observer (node5)
+#
+# Usage:
+#   ansible-playbook -i inventory/dev.ini up-dev.yml
+# ============================================================
+
+
+# ---- Log trail: START --------------------------------------
+- name: "Log trail"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/log_trail.yml
+      vars:
+        trail_operation: UP
+        trail_env: DEV
+        trail_status: START
+
+
+# ---- Step 1: bootstrap and validator3 ----------------------
+- name: "[server-2] Start bootstrap and validator3"
+  hosts: dev_server2
+  gather_facts: false
+  tasks:
+    # Pull and start bootstrap first, then validator3
+    - name: "Pull latest image: bootstrap"
+      shell: "docker compose -f {{ compose_jobs[0].compose_file }} pull"
+      args:
+        chdir: "{{ compose_jobs[0].work_dir }}"
+      changed_when: true
+      register: r
+      failed_when: r.rc != 0
+
+    - name: "Start bootstrap"
+      shell: "docker compose -f {{ compose_jobs[0].compose_file }} up -d"
+      args:
+        chdir: "{{ compose_jobs[0].work_dir }}"
+      changed_when: true
+      register: r
+      failed_when: r.rc != 0
+
+    - name: "Pull latest image: validator3"
+      shell: "docker compose -f {{ compose_jobs[1].compose_file }} pull"
+      args:
+        chdir: "{{ compose_jobs[1].work_dir }}"
+      changed_when: true
+      register: r
+      failed_when: r.rc != 0
+
+    - name: "Start validator3"
+      shell: "docker compose -f {{ compose_jobs[1].compose_file }} up -d"
+      args:
+        chdir: "{{ compose_jobs[1].work_dir }}"
+      changed_when: true
+      register: r
+      failed_when: r.rc != 0
+
+
+# ---- Step 2: validator1 and validator2 ---------------------
+- name: "[server-1] Start validator1 and validator2"
+  hosts: dev_server1
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/start_nodes.yml
+
+
+# ---- Step 3: health check on both servers ------------------
+- name: "Health check — wait for Casper initialization"
+  hosts: dev_server1:dev_server2
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/health_check_casper.yml
+
+
+# ---- Step 4: observer --------------------------------------
+- name: "[server-4] Start observer"
+  hosts: dev_server4
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/start_nodes.yml
+    - include_tasks: tasks/health_check_observer.yml
+
+
+# ---- Log trail: SUCCESS ------------------------------------
+- name: "Log trail"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/log_trail.yml
+      vars:
+        trail_operation: UP
+        trail_env: DEV
+        trail_status: SUCCESS

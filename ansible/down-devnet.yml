@@ -1,0 +1,68 @@
+---
+# ============================================================
+# ASI-Chain DEVNET — Stop network
+#
+# What happens:
+#   1. Stop deployer bot on devnet-1
+#   2. docker compose down on all nodes
+#   3. Wipe data/ directories in node root dirs
+#
+# Usage:
+#   ansible-playbook -i inventory/devnet.ini down-devnet.yml
+# ============================================================
+
+
+# ---- Log trail: START --------------------------------------
+- name: "Log trail"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/log_trail.yml
+      vars:
+        trail_operation: DOWN
+        trail_env: DEVNET
+        trail_status: START
+
+
+# ---- Step 1: stop deployer first ---------------------------
+- name: "[devnet-1] Stop deployer bot"
+  hosts: devnet_bootstrap
+  gather_facts: false
+  tasks:
+    - name: "Stop deployer bot"
+      shell: "docker compose -f {{ deployer_compose_file }} down"
+      args:
+        chdir: "{{ deployer_work_dir }}"
+      changed_when: true
+      register: r
+      failed_when:
+        - r.rc != 0
+        - "'no such container' not in (r.stderr | lower)"
+
+
+# ---- Step 2: stop all nodes --------------------------------
+- name: "Stop all nodes"
+  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/stop_nodes.yml
+
+
+# ---- Step 3: clean data directories ------------------------
+- name: "Clean data directories on all nodes"
+  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/cleanup_data.yml
+
+
+# ---- Log trail: SUCCESS ------------------------------------
+- name: "Log trail"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/log_trail.yml
+      vars:
+        trail_operation: DOWN
+        trail_env: DEVNET
+        trail_status: SUCCESS

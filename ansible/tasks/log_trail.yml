@@ -1,0 +1,11 @@
+# Append one line to the local operations log.
+# Required variables: trail_operation (UP/DOWN), trail_env (DEV/DEVNET), trail_status (START/SUCCESS)
+---
+- name: "Log trail: {{ trail_operation }} {{ trail_env }} {{ trail_status }}"
+  shell: >
+    mkdir -p {{ playbook_dir }}/logs &&
+    echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') | {{ '%-4s' | format(trail_operation) }} | {{ '%-6s' | format(trail_env) }} | {{ trail_status }}"
+    >> {{ playbook_dir }}/logs/operations.log
+  delegate_to: localhost
+  run_once: true
+  changed_when: false

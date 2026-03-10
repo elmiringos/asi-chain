@@ -1,0 +1,17 @@
+# Remove named volumes on docker compose down to ensure fresh state on next up
+compose_down_flags: "-v"
+
+compose_jobs:
+  - name: bootstrap
+    work_dir: ~/actual-dev-chain
+    compose_file: boot.yml
+  - name: validator3
+    work_dir: ~/actual-dev-chain
+    compose_file: val3.yml
+
+local_containers:
+  - bootstrap
+  - validator3
+
+deployer_work_dir: ~/actual-dev-chain
+deployer_compose_file: deployer.yml

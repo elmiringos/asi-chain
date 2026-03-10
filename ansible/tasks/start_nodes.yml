@@ -1,0 +1,23 @@
+# Pull latest images and start compose services defined in host's compose_jobs.
+---
+- name: "Pull latest image"
+  shell: "docker compose -f {{ item.compose_file }} pull"
+  args:
+    chdir: "{{ item.work_dir }}"
+  loop: "{{ compose_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true
+  register: result
+  failed_when: result.rc != 0
+
+- name: "Start node"
+  shell: "docker compose -f {{ item.compose_file }} up -d"
+  args:
+    chdir: "{{ item.work_dir }}"
+  loop: "{{ compose_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true
+  failed_when: result.rc != 0
+  register: result

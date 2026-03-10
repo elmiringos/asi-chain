@@ -1,0 +1,13 @@
+# Default: do not remove volumes on docker compose down
+# Override per host group (e.g. dev servers set this to "-v")
+compose_down_flags: ""
+
+# Health check: wait for MultiParentCasper initialization
+# 20 retries * 15s = 5 minutes
+casper_check_retries: 20
+casper_check_delay: 15
+
+# Health check: wait for observer to sync blocks
+# 16 retries * 15s = 4 minutes
+observer_check_retries: 16
+observer_check_delay: 15

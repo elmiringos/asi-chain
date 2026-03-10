@@ -1,0 +1,10 @@
+compose_jobs:
+  - name: validator3
+    work_dir: ~/devnet-validator3
+    compose_file: validator3.yml
+
+local_containers:
+  - validator3
+
+data_dirs:
+  - ~/devnet-validator3/data

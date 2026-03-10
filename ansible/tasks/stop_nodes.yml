@@ -1,0 +1,16 @@
+# Stop and remove compose services defined in host's compose_jobs.
+---
+- name: "Stop node"
+  shell: "docker compose -f {{ item.compose_file }} down {{ compose_down_flags }}"
+  args:
+    chdir: "{{ item.work_dir }}"
+  loop: "{{ compose_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true
+  register: result
+  # Treat "already stopped / no container" as success
+  failed_when:
+    - result.rc != 0
+    - "'no such container' not in (result.stderr | lower)"
+    - "'no configuration file' not in (result.stderr | lower)"

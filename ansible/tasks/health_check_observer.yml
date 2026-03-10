@@ -1,0 +1,47 @@
+# Wait until observer starts syncing blocks.
+# On first failure: stop container, restart, retry once more.
+# On second failure: hard fail with actionable message.
+---
+- name: "Wait for observer to sync blocks"
+  shell: "docker logs observer 2>&1 | grep -c 'Approved'"
+  register: observer_sync
+  until: observer_sync.stdout | int > 0
+  retries: "{{ observer_check_retries }}"
+  delay: "{{ observer_check_delay }}"
+  changed_when: false
+  ignore_errors: true
+
+- name: "Observer did not sync — restart and retry"
+  when: observer_sync is failed or observer_sync.stdout | int == 0
+  block:
+    - name: "Stop observer"
+      shell: "docker compose -f {{ item.compose_file }} down"
+      args:
+        chdir: "{{ item.work_dir }}"
+      loop: "{{ compose_jobs }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Start observer"
+      shell: "docker compose -f {{ item.compose_file }} up -d"
+      args:
+        chdir: "{{ item.work_dir }}"
+      loop: "{{ compose_jobs }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Wait for observer to sync blocks (retry)"
+      shell: "docker logs observer 2>&1 | grep -c 'Approved'"
+      register: observer_sync_retry
+      until: observer_sync_retry.stdout | int > 0
+      retries: "{{ observer_check_retries }}"
+      delay: "{{ observer_check_delay }}"
+      changed_when: false
+
+    - name: "Fail: observer is not syncing after restart"
+      fail:
+        msg: |
+          [Stage: observer sync] Observer is not syncing blocks after restart.
+          Check logs: docker logs observer
+          Hint: verify the network is alive and bootstrap is reachable.
+      when: observer_sync_retry.stdout | int == 0
