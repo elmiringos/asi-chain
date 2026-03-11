@@ -1,4 +1,4 @@
-# Wait until MultiParentCasper is initialized in each container from local_containers.
+# Wait until MultiParentCasper is initialized in each validator container.
 # Retries up to casper_check_retries * casper_check_delay seconds (default 5 min).
 ---
 - name: "Wait for MultiParentCasper initialization"
@@ -7,7 +7,7 @@
   until: casper_check.stdout | int > 0
   retries: "{{ casper_check_retries }}"
   delay: "{{ casper_check_delay }}"
-  loop: "{{ local_containers }}"
+  loop: "{{ validator_containers }}"
   loop_control:
     label: "{{ item }}"
   changed_when: false

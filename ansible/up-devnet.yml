@@ -55,7 +55,7 @@
 
 # ---- Step 3: health check on all nodes ---------------------
 - name: "Health check — wait for Casper initialization"
-  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3
+  hosts: devnet_val1:devnet_val2:devnet_val3
   gather_facts: false
   tasks:
     - include_tasks: tasks/health_check_casper.yml

@@ -3,7 +3,7 @@ compose_jobs:
     work_dir: ~/devnet-bootstrap
     compose_file: bootstrap.yml
 
-local_containers:
+bootstrap_containers:
   - bootstrap
 
 deployer_work_dir: ~/bot/deployer-bot

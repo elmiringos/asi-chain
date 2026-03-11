@@ -6,6 +6,6 @@ compose_jobs:
     work_dir: ~/actual-dev-chain
     compose_file: v1-v2.yml
 
-local_containers:
+validator_containers:
   - validator1
   - validator2

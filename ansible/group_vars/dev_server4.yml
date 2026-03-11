@@ -6,5 +6,5 @@ compose_jobs:
     work_dir: ~/observer
     compose_file: observer.yml
 
-local_containers:
+observer_containers:
   - observer

@@ -9,8 +9,10 @@ compose_jobs:
     work_dir: ~/actual-dev-chain
     compose_file: val3.yml
 
-local_containers:
+bootstrap_containers:
   - bootstrap
+
+validator_containers:
   - validator3
 
 deployer_work_dir: ~/actual-dev-chain
