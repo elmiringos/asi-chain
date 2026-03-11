@@ -29,38 +29,7 @@
   hosts: dev_server2
   gather_facts: false
   tasks:
-    # Pull and start bootstrap first, then validator3
-    - name: "Pull latest image: bootstrap"
-      shell: "docker compose -f {{ compose_jobs[0].compose_file }} pull"
-      args:
-        chdir: "{{ compose_jobs[0].work_dir }}"
-      changed_when: true
-      register: r
-      failed_when: r.rc != 0
-
-    - name: "Start bootstrap"
-      shell: "docker compose -f {{ compose_jobs[0].compose_file }} up -d"
-      args:
-        chdir: "{{ compose_jobs[0].work_dir }}"
-      changed_when: true
-      register: r
-      failed_when: r.rc != 0
-
-    - name: "Pull latest image: validator3"
-      shell: "docker compose -f {{ compose_jobs[1].compose_file }} pull"
-      args:
-        chdir: "{{ compose_jobs[1].work_dir }}"
-      changed_when: true
-      register: r
-      failed_when: r.rc != 0
-
-    - name: "Start validator3"
-      shell: "docker compose -f {{ compose_jobs[1].compose_file }} up -d"
-      args:
-        chdir: "{{ compose_jobs[1].work_dir }}"
-      changed_when: true
-      register: r
-      failed_when: r.rc != 0
+    - include_tasks: tasks/start_nodes.yml
 
 
 # ---- Step 2: validator1 and validator2 ---------------------

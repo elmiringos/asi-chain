@@ -4,7 +4,7 @@
 #
 # What happens:
 #   1. Stop deployer bot on devnet-1
-#   2. docker compose down on all nodes
+#   2. docker compose down on all nodes + observer
 #   3. Wipe data/ directories in node root dirs
 #
 # Usage:
@@ -42,7 +42,7 @@
 
 # ---- Step 2: stop all nodes --------------------------------
 - name: "Stop all nodes"
-  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3
+  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3:devnet_observer
   gather_facts: false
   tasks:
     - include_tasks: tasks/stop_nodes.yml
@@ -50,7 +50,7 @@
 
 # ---- Step 3: clean data directories ------------------------
 - name: "Clean data directories on all nodes"
-  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3
+  hosts: devnet_bootstrap:devnet_val1:devnet_val2:devnet_val3:devnet_observer
   gather_facts: false
   tasks:
     - include_tasks: tasks/cleanup_data.yml

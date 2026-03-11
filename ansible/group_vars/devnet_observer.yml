@@ -1,0 +1,10 @@
+compose_jobs:
+  - name: observer
+    work_dir: ~/devnet-observer
+    compose_file: observer.yml
+
+observer_containers:
+  - observer
+
+data_dirs:
+  - ~/devnet-observer/data

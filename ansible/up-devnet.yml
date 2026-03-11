@@ -7,6 +7,7 @@
 #   devnet_val1       (devnet-2) — validator1 (node0, dev-mode)
 #   devnet_val2       (devnet-3) — validator2 (node0)
 #   devnet_val3       (devnet-4) — validator3 (node0)
+#   devnet_observer   (devnet-5) — observer
 #
 # Usage:
 #   ansible-playbook -i inventory/devnet.ini up-devnet.yml
@@ -61,7 +62,16 @@
     - include_tasks: tasks/health_check_casper.yml
 
 
-# ---- Step 4: deployer bot ----------------------------------
+# ---- Step 4: observer --------------------------------------
+- name: "[devnet-5] Start observer"
+  hosts: devnet_observer
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/start_nodes.yml
+    - include_tasks: tasks/health_check_observer.yml
+
+
+# ---- Step 5: deployer bot ----------------------------------
 - name: "[devnet-1] Start deployer bot"
   hosts: devnet_bootstrap
   gather_facts: false
