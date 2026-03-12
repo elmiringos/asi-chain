@@ -7,7 +7,8 @@ compose_down_flags: ""
 casper_check_retries: 20
 casper_check_delay: 15
 
-# Health check: wait for observer to sync blocks
-# 16 retries * 15s = 4 minutes
-observer_check_retries: 16
-observer_check_delay: 15
+# Health check: wait for observer to reach Running state
+# LFS sync is the slowest stage — can take 15-20 min on cold start
+# 60 retries * 20s = 20 minutes
+observer_check_retries: 60
+observer_check_delay: 20

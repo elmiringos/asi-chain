@@ -1,21 +1,48 @@
-# Wait until observer starts syncing blocks.
+# Observer health check — waits for full node startup sequence:
+#   1. "First connection established"  — connected to bootstrap
+#   2. "Received approved block"       — bootstrap/shard-name OK
+#   3. "Rholang state received"        — LFS sync complete (slowest stage)
+#   4. "All tasks started. Node is now running." — final indicator
+#
 # On first failure: stop container, restart, retry once more.
-# On second failure: hard fail with actionable message.
+# On second failure: hard fail with diagnostics.
 ---
-- name: "Wait for observer to sync blocks"
-  shell: "docker logs observer 2>&1 | grep -c 'Approved'"
-  register: observer_sync
-  until: observer_sync.stdout | int > 0
+- name: "Wait for observer to reach Running state"
+  shell: >
+    docker logs observer 2>&1 |
+    grep -c "All tasks started. Node is now running."
+  register: observer_running
+  until: observer_running.stdout | int > 0
   retries: "{{ observer_check_retries }}"
   delay: "{{ observer_check_delay }}"
   changed_when: false
   ignore_errors: true
 
-- name: "Observer did not sync — restart and retry"
-  when: observer_sync is failed or observer_sync.stdout | int == 0
+- name: "Observer did not reach Running state — restart and retry"
+  when: observer_running is failed or observer_running.stdout | int == 0
   block:
+    - name: "Diagnose: check last reached stage before restart"
+      shell: |
+        echo "=== Observer startup diagnostics ==="
+        echo -n "First connection established: "
+        docker logs observer 2>&1 | grep -c "First connection established" || true
+        echo -n "Received approved block:      "
+        docker logs observer 2>&1 | grep -c "Received approved block from bootstrap" || true
+        echo -n "Rholang state received:       "
+        docker logs observer 2>&1 | grep -c "Rholang state received" || true
+        echo -n "Transition to Running:        "
+        docker logs observer 2>&1 | grep -c "Making a transition to Running state" || true
+        echo -n "All tasks started:            "
+        docker logs observer 2>&1 | grep -c "All tasks started. Node is now running." || true
+      register: observer_diag
+      changed_when: false
+
+    - name: "Print diagnostics"
+      debug:
+        msg: "{{ observer_diag.stdout_lines }}"
+
     - name: "Stop observer"
-      shell: "docker compose -f {{ item.compose_file }} down"
+      shell: "docker compose -f {{ item.compose_file }} down {{ compose_down_flags }}"
       args:
         chdir: "{{ item.work_dir }}"
       loop: "{{ compose_jobs }}"
@@ -30,18 +57,27 @@
       loop_control:
         label: "{{ item.name }}"
 
-    - name: "Wait for observer to sync blocks (retry)"
-      shell: "docker logs observer 2>&1 | grep -c 'Approved'"
-      register: observer_sync_retry
-      until: observer_sync_retry.stdout | int > 0
+    - name: "Wait for observer to reach Running state (retry)"
+      shell: >
+        docker logs observer 2>&1 |
+        grep -c "All tasks started. Node is now running."
+      register: observer_running_retry
+      until: observer_running_retry.stdout | int > 0
       retries: "{{ observer_check_retries }}"
       delay: "{{ observer_check_delay }}"
       changed_when: false
 
-    - name: "Fail: observer is not syncing after restart"
+    - name: "Fail: observer did not reach Running state after restart"
       fail:
         msg: |
-          [Stage: observer sync] Observer is not syncing blocks after restart.
+          [Stage: observer startup] Observer did not reach Running state after restart.
+
+          Expected log sequence:
+            1. "First connection established"          — bootstrap connectivity
+            2. "Received approved block from bootstrap" — bootstrap / shard-name OK
+            3. "Rholang state received"                — LFS sync complete
+            4. "All tasks started. Node is now running." — node fully up
+
           Check logs: docker logs observer
-          Hint: verify the network is alive and bootstrap is reachable.
-      when: observer_sync_retry.stdout | int == 0
+          Hint: verify bootstrap address, shard-name, and network connectivity.
+      when: observer_running_retry.stdout | int == 0
