@@ -1,0 +1,47 @@
+---
+# ============================================================
+# Build and push rust-node Docker image
+#
+# What happens:
+#   1. git pull origin rust/dev  in {{ node_repo_dir }}
+#   2. docker build -f {{ node_dockerfile }} -t {{ node_image }} .
+#   3. docker push {{ node_image }}
+#
+# Usage:
+#   ansible-playbook -i inventory/dev.ini build-node.yml
+# ============================================================
+
+
+- name: "Build and push rust-node image"
+  hosts: build_server
+  gather_facts: false
+  tasks:
+
+    - name: "Git pull origin rust/dev"
+      shell: git pull origin rust/dev
+      args:
+        chdir: "{{ node_repo_dir }}"
+      register: git_pull
+      changed_when: "'Already up to date' not in git_pull.stdout"
+
+    - name: "Print git pull result"
+      debug:
+        msg: "{{ git_pull.stdout_lines }}"
+
+    - name: "Docker build"
+      shell: "docker build -f {{ node_dockerfile }} -t {{ node_image }} ."
+      args:
+        chdir: "{{ node_repo_dir }}"
+      register: docker_build
+      changed_when: true
+      async: 3600
+      poll: 30
+
+    - name: "Docker push"
+      shell: "docker push {{ node_image }}"
+      register: docker_push
+      changed_when: true
+
+    - name: "Print push result"
+      debug:
+        msg: "{{ docker_push.stdout_lines }}"
