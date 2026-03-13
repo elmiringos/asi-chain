@@ -8,3 +8,5 @@ compose_jobs:
 
 observer_containers:
   - observer
+
+observer_http_port: 40453

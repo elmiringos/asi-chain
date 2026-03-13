@@ -6,5 +6,7 @@ compose_jobs:
 observer_containers:
   - observer
 
+observer_http_port: 40403
+
 data_dirs:
   - ~/devnet-observer/data

@@ -33,6 +33,12 @@
   tasks:
     - include_tasks: tasks/start_nodes.yml
 
+- name: "[devnet-1] Wait for bootstrap to accept connections"
+  hosts: devnet_bootstrap
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/health_check_bootstrap.yml
+
 
 # ---- Step 2: validators ------------------------------------
 - name: "[devnet-2] Start validator1"

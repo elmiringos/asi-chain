@@ -24,15 +24,31 @@
         trail_status: START
 
 
-# ---- Step 1: bootstrap and validator3 ----------------------
-- name: "[server-2] Start bootstrap and validator3"
+# ---- Step 1: bootstrap -----------------------------------------
+- name: "[server-2] Start bootstrap"
   hosts: dev_server2
   gather_facts: false
   tasks:
     - include_tasks: tasks/start_nodes.yml
+      vars:
+        compose_jobs: "{{ bootstrap_compose_jobs }}"
+
+- name: "[server-2] Wait for bootstrap to accept connections"
+  hosts: dev_server2
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/health_check_bootstrap.yml
 
 
-# ---- Step 2: validator1 and validator2 ---------------------
+# ---- Step 2: validator3 and validator1+2 -------------------
+- name: "[server-2] Start validator3"
+  hosts: dev_server2
+  gather_facts: false
+  tasks:
+    - include_tasks: tasks/start_nodes.yml
+      vars:
+        compose_jobs: "{{ validator3_compose_jobs }}"
+
 - name: "[server-1] Start validator1 and validator2"
   hosts: dev_server1
   gather_facts: false

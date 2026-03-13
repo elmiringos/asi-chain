@@ -9,6 +9,18 @@ compose_jobs:
     work_dir: ~/actual-dev-chain
     compose_file: val3.yml
 
+bootstrap_compose_jobs:
+  - name: bootstrap
+    work_dir: ~/actual-dev-chain
+    compose_file: boot.yml
+
+validator3_compose_jobs:
+  - name: validator3
+    work_dir: ~/actual-dev-chain
+    compose_file: val3.yml
+
+bootstrap_protocol_port: 40400
+
 bootstrap_containers:
   - bootstrap
 
