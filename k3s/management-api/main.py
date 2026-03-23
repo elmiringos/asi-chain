@@ -1,23 +1,25 @@
 import asyncio
 import logging
-from typing import List
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from kubernetes.client.rest import ApiException
 
 import k8s_ops as k8s
+from domain import ConsensusView, NetworkPartition, NodeChainState
 from models import (
-    ValidatorStatus,
-    PartitionRequest,
-    PartitionInfo,
-    ThrottleRequest,
+    ConsensusHealthResponse,
+    ConsensusNodeResponse,
     LatencyRequest,
-    NodeK8sStatus,
-    NodeChainStatus,
-    ConsensusNodeState,
-    ConsensusHealth,
+    NodeChainStatusResponse,
+    PartitionRequest,
+    PartitionResponse,
+    PodStatusResponse,
+    ThrottleRequest,
+    ValidatorResponse,
 )
+from settings import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,19 +30,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-NODE_BASE_URLS = {
-    "bootstrap":  "http://bootstrap-0.bootstrap.asi-chain.svc.cluster.local:40403",
-    "validator1": "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403",
-    "validator2": "http://validator2-0.validator2.asi-chain.svc.cluster.local:40403",
-    "validator3": "http://validator3-0.validator3.asi-chain.svc.cluster.local:40403",
-    "validator4": "http://validator4-0.validator4.asi-chain.svc.cluster.local:40403",
-    "validator5": "http://validator5-0.validator5.asi-chain.svc.cluster.local:40403",
-    "validator6": "http://validator6-0.validator6.asi-chain.svc.cluster.local:40403",
-    "observer":   "http://observer-0.observer.asi-chain.svc.cluster.local:40403",
-}
 
-
-def _raise_if_k8s_error(e: ApiException, detail: str):
+def _raise_if_k8s_error(e: ApiException, detail: str) -> None:
     if e.status == 404:
         raise HTTPException(status_code=404, detail=detail)
     if e.status == 409:
@@ -49,17 +40,17 @@ def _raise_if_k8s_error(e: ApiException, detail: str):
 
 
 @app.get("/health", tags=["system"])
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/validators", response_model=List[ValidatorStatus], tags=["validators"])
-def list_validators():
-    return k8s.list_validators()
+@app.get("/validators", response_model=list[ValidatorResponse], tags=["validators"])
+def list_validators() -> list[ValidatorResponse]:
+    return [ValidatorResponse.from_domain(v) for v in k8s.list_validators()]
 
 
 @app.post("/validators/{name}/start", tags=["validators"])
-def start_validator(name: str):
+def start_validator(name: str) -> dict[str, str]:
     try:
         k8s.scale_validator(name, replicas=1)
     except ApiException as e:
@@ -68,7 +59,7 @@ def start_validator(name: str):
 
 
 @app.post("/validators/{name}/stop", tags=["validators"])
-def stop_validator(name: str):
+def stop_validator(name: str) -> dict[str, str]:
     try:
         k8s.scale_validator(name, replicas=0)
     except ApiException as e:
@@ -77,7 +68,7 @@ def stop_validator(name: str):
 
 
 @app.post("/validators/{name}/restart", tags=["validators"])
-def restart_validator(name: str):
+def restart_validator(name: str) -> dict[str, str]:
     try:
         k8s.restart_validator(name)
     except ApiException as e:
@@ -85,27 +76,28 @@ def restart_validator(name: str):
     return {"name": name, "action": "restarted"}
 
 
-@app.post("/partitions", response_model=PartitionInfo, tags=["network"])
-def create_partition(req: PartitionRequest):
-    overlap = set(req.group_a) & set(req.group_b)
-    if overlap:
-        raise HTTPException(status_code=400, detail=f"Nodes in both groups: {overlap}")
+@app.post("/partitions", response_model=PartitionResponse, tags=["network"])
+def create_partition(req: PartitionRequest) -> PartitionResponse:
+    partition = NetworkPartition(id=req.id, group_a=req.group_a, group_b=req.group_b)
     try:
-        k8s.create_partition(req.id, req.group_a, req.group_b)
+        partition.validate()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        k8s.create_partition(partition)
     except ApiException as e:
         _raise_if_k8s_error(e, f"Failed to create partition '{req.id}'")
-    return {"id": req.id, "policies": [
-        f"partition-{req.id}-{n}" for n in req.group_a + req.group_b
-    ]}
+    partition.policies = [f"partition-{req.id}-{n}" for n in req.group_a + req.group_b]
+    return PartitionResponse.from_domain(partition)
 
 
-@app.get("/partitions", response_model=List[PartitionInfo], tags=["network"])
-def list_partitions():
-    return k8s.list_partitions()
+@app.get("/partitions", response_model=list[PartitionResponse], tags=["network"])
+def list_partitions() -> list[PartitionResponse]:
+    return [PartitionResponse.from_domain(p) for p in k8s.list_partitions()]
 
 
 @app.delete("/partitions/{partition_id}", tags=["network"])
-def delete_partition(partition_id: str):
+def delete_partition(partition_id: str) -> dict[str, str]:
     try:
         k8s.delete_partition(partition_id)
     except ApiException as e:
@@ -114,7 +106,7 @@ def delete_partition(partition_id: str):
 
 
 @app.post("/nodes/{name}/isolate", tags=["network"])
-def isolate_node(name: str):
+def isolate_node(name: str) -> dict[str, str]:
     try:
         k8s.isolate_node(name)
     except ApiException as e:
@@ -123,7 +115,7 @@ def isolate_node(name: str):
 
 
 @app.delete("/nodes/{name}/isolate", tags=["network"])
-def unisolate_node(name: str):
+def unisolate_node(name: str) -> dict[str, str]:
     try:
         k8s.unisolate_node(name)
     except ApiException as e:
@@ -132,7 +124,7 @@ def unisolate_node(name: str):
 
 
 @app.post("/nodes/{name}/throttle", tags=["chaos"])
-def throttle_node(name: str, req: ThrottleRequest):
+def throttle_node(name: str, req: ThrottleRequest) -> dict[str, str]:
     try:
         k8s.throttle_node(name, req.cpu, req.memory)
     except ApiException as e:
@@ -141,7 +133,7 @@ def throttle_node(name: str, req: ThrottleRequest):
 
 
 @app.delete("/nodes/{name}/throttle", tags=["chaos"])
-def unthrottle_node(name: str):
+def unthrottle_node(name: str) -> dict[str, str]:
     try:
         k8s.unthrottle_node(name)
     except ApiException as e:
@@ -150,33 +142,38 @@ def unthrottle_node(name: str):
 
 
 @app.post("/nodes/{name}/latency", tags=["chaos"])
-def inject_latency(name: str, req: LatencyRequest):
+def inject_latency(name: str, req: LatencyRequest) -> dict[str, Any]:
     try:
         k8s.inject_latency(name, req.delay_ms, req.jitter_ms)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"tc exec failed: {e}")
-    return {"name": name, "action": "latency_injected", "delay_ms": req.delay_ms, "jitter_ms": req.jitter_ms}
+        raise HTTPException(status_code=500, detail=f"tc exec failed: {e}") from e
+    return {
+        "name": name,
+        "action": "latency_injected",
+        "delay_ms": req.delay_ms,
+        "jitter_ms": req.jitter_ms,
+    }
 
 
 @app.delete("/nodes/{name}/latency", tags=["chaos"])
-def remove_latency(name: str):
+def remove_latency(name: str) -> dict[str, str]:
     try:
         k8s.remove_latency(name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"tc exec failed: {e}")
+        raise HTTPException(status_code=500, detail=f"tc exec failed: {e}") from e
     return {"name": name, "action": "latency_removed"}
 
 
-@app.get("/nodes/{name}/status", response_model=NodeChainStatus, tags=["observability"])
-async def node_status(name: str):
-    url = NODE_BASE_URLS.get(name)
+@app.get("/nodes/{name}/status", response_model=NodeChainStatusResponse, tags=["observability"])
+async def node_status(name: str) -> NodeChainStatusResponse:
+    url = settings.node_urls.get(name)
     if not url:
         raise HTTPException(status_code=404, detail=f"Unknown node '{name}'")
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    async with httpx.AsyncClient(timeout=settings.node_request_timeout) as client:
         try:
             resp = await client.get(f"{url}/status")
             data = resp.json()
-            return NodeChainStatus(
+            state = NodeChainState(
                 name=name,
                 reachable=True,
                 version=data.get("version"),
@@ -184,60 +181,52 @@ async def node_status(name: str):
                 nodes=data.get("nodes"),
             )
         except Exception:
-            return NodeChainStatus(name=name, reachable=False)
+            state = NodeChainState(name=name, reachable=False)
+    return NodeChainStatusResponse.from_domain(state)
 
 
-@app.get("/nodes/{name}/k8s-status", response_model=NodeK8sStatus, tags=["observability"])
-def node_k8s_status(name: str):
-    return k8s.get_pod_status(name)
+@app.get("/nodes/{name}/k8s-status", response_model=PodStatusResponse, tags=["observability"])
+def node_k8s_status(name: str) -> PodStatusResponse:
+    return PodStatusResponse.from_domain(k8s.get_pod_status(name))
 
 
-@app.get("/consensus/health", response_model=ConsensusHealth, tags=["observability"])
-async def consensus_health():
-    nodes = await _fetch_consensus_states()
-    finalized = [n.finalized_block for n in nodes if n.finalized_block is not None]
-    in_sync = len(set(finalized)) <= 1
-    lags = [n.lag for n in nodes if n.lag is not None]
-    return ConsensusHealth(
-        nodes=nodes,
-        finalized_in_sync=in_sync,
-        max_lag=max(lags) if lags else None,
-    )
+@app.get("/consensus/health", response_model=ConsensusHealthResponse, tags=["observability"])
+async def consensus_health() -> ConsensusHealthResponse:
+    view = ConsensusView(nodes=await _fetch_consensus_states())
+    return ConsensusHealthResponse.from_domain(view)
 
 
 @app.get("/consensus/lag", tags=["observability"])
-async def consensus_lag():
+async def consensus_lag() -> list[ConsensusNodeResponse]:
     nodes = await _fetch_consensus_states()
-    return [
-        {"name": n.name, "latest_block": n.latest_block, "finalized_block": n.finalized_block, "lag": n.lag}
-        for n in nodes
-    ]
+    return [ConsensusNodeResponse.from_domain(n) for n in nodes]
 
 
-async def _fetch_consensus_states() -> list[ConsensusNodeState]:
-    async def fetch_one(name: str, base_url: str) -> ConsensusNodeState:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+async def _fetch_consensus_states() -> list[NodeChainState]:
+    async def fetch_one(name: str, base_url: str) -> NodeChainState:
+        async with httpx.AsyncClient(timeout=settings.node_request_timeout) as client:
             try:
                 blocks_resp, fin_resp = await asyncio.gather(
                     client.get(f"{base_url}/api/blocks"),
                     client.get(f"{base_url}/api/last-finalized-block"),
                 )
-                latest = blocks_resp.json()[0].get("blockNumber") if blocks_resp.status_code == 200 else None
+                latest = (
+                    blocks_resp.json()[0].get("blockNumber")
+                    if blocks_resp.status_code == 200
+                    else None
+                )
                 fin_data = fin_resp.json() if fin_resp.status_code == 200 else {}
                 fin_block = fin_data.get("blockInfo", {}).get("blockNumber")
                 fin_ft = fin_data.get("blockInfo", {}).get("faultTolerance")
-                lag = (latest - fin_block) if (latest is not None and fin_block is not None) else None
-                return ConsensusNodeState(
-                    name=name, reachable=True,
-                    latest_block=latest, finalized_block=fin_block,
-                    fault_tolerance=fin_ft, lag=lag,
+                return NodeChainState(
+                    name=name,
+                    reachable=True,
+                    latest_block=latest,
+                    finalized_block=fin_block,
+                    fault_tolerance=fin_ft,
                 )
             except Exception:
-                return ConsensusNodeState(name=name, reachable=False)
+                return NodeChainState(name=name, reachable=False)
 
-    tasks = [
-        fetch_one(name, url)
-        for name, url in NODE_BASE_URLS.items()
-        if name != "observer"
-    ]
+    tasks = [fetch_one(name, url) for name, url in settings.node_urls.items() if name != "observer"]
     return await asyncio.gather(*tasks)

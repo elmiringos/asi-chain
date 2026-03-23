@@ -1,5 +1,8 @@
 KUBECTL = kubectl
 NAMESPACE = asi-chain
+AUTOPROPOSE ?= 1
+
+_AUTOPROPOSE_SED = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
 
 -include .env
 export
@@ -63,9 +66,10 @@ start:
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 	@echo ""
-	@echo "==> Starting bootstrap (node ID: $(BOOTSTRAP_NODE_ID))..."
+	@echo "==> Starting bootstrap (node ID: $(BOOTSTRAP_NODE_ID), autopropose=$(AUTOPROPOSE))..."
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
+		$(_AUTOPROPOSE_SED) \
 		statefulset-bootstrap.yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) rollout status statefulset/bootstrap -n $(NAMESPACE) --timeout=120s
 
@@ -79,6 +83,7 @@ start:
 		-e "s/REPLACE_V2_PRIVKEY/$(VALIDATOR2_PRIVATE_KEY)/g" \
 		-e "s/REPLACE_V3_PUBKEY/$(VALIDATOR3_PUBLIC_KEY)/g" \
 		-e "s/REPLACE_V3_PRIVKEY/$(VALIDATOR3_PRIVATE_KEY)/g" \
+		$(_AUTOPROPOSE_SED) \
 		statefulset-validators.yaml | $(KUBECTL) apply -f -
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
@@ -88,8 +93,11 @@ start:
 	@echo "==> Done. Check status with: make status"
 
 stop:
+	@echo "==> Deleting PVCs to wipe node data..."
+	@$(KUBECTL) delete pvc --all -n $(NAMESPACE) --ignore-not-found
+	@echo "==> Waiting for PVs to be reclaimed..."
+	@$(KUBECTL) wait pvc --all -n $(NAMESPACE) --for=delete --timeout=120s 2>/dev/null || true
 	@$(KUBECTL) delete namespace $(NAMESPACE) --ignore-not-found
-	@rm -rf .certs
 
 restart: stop
 	@echo "Waiting for namespace to be fully deleted..."
@@ -146,7 +154,7 @@ api-build:
 	@echo "==> Building management-api image..."
 	@docker build -t management-api:latest management-api/
 	@echo "==> Importing image into k3s..."
-	@k3s ctr images import <(docker save management-api:latest)
+	@docker save management-api:latest | k3s ctr images import -
 
 api-start:
 	@echo "==> Deploying management-api..."
