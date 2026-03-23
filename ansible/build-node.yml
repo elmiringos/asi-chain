@@ -4,7 +4,7 @@
 #
 # What happens:
 #   1. git pull origin rust/dev  in {{ node_repo_dir }}
-#   2. docker build -f {{ node_dockerfile }} -t {{ node_image }} .
+#   2. ./node/docker-commands.sh build-local
 #   3. docker push {{ node_image }}
 #
 # Usage:
@@ -29,7 +29,7 @@
         msg: "{{ git_pull.stdout_lines }}"
 
     - name: "Docker build"
-      shell: "docker build -f {{ node_dockerfile }} -t {{ node_image }} ."
+      shell: "DOCKER_REPOSITORY={{ node_image.split('/')[0] }} IMAGE_NAME={{ node_image.split(':')[0].split('/')[-1] }} ./node/docker-commands.sh build-local"
       args:
         chdir: "{{ node_repo_dir }}"
       register: docker_build

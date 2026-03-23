@@ -9,3 +9,6 @@ compose_jobs:
 validator_containers:
   - validator1
   - validator2
+
+# Deploy target — validator1 HTTP API
+validator1_http_port: 40413
