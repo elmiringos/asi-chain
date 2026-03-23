@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: observer
+  namespace: asi-chain
+  labels:
+    app: asi-chain
+    role: observer
+spec:
+  serviceName: observer
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asi-chain
+      role: observer
+  template:
+    metadata:
+      labels:
+        app: asi-chain
+        role: observer
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: observer
+          image: amamata/rust-node:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "run"
+            - "--host=$(NODE_HOST)"
+            - "--bootstrap=rnode://$(BOOTSTRAP_NODE_ID)@$(BOOTSTRAP_HOST)?protocol=40400&discovery=40404"
+            - "--network-id=$(NETWORK_ID)"
+            - "--no-upnp"
+            - "--allow-private-addresses"
+          env:
+            - name: NODE_HOST
+              value: "observer-0.observer.asi-chain.svc.cluster.local"
+            - name: BOOTSTRAP_HOST
+              value: "bootstrap-0.bootstrap.asi-chain.svc.cluster.local"
+            - name: NETWORK_ID
+              value: "testnet"
+            - name: BOOTSTRAP_NODE_ID
+              value: "REPLACE_ME"
+            - name: MALLOC_ARENA_MAX
+              value: "2"
+            - name: MALLOC_TRIM_THRESHOLD_
+              value: "131072"
+            - name: MALLOC_MMAP_THRESHOLD_
+              value: "131072"
+            - name: F1R3_MAX_USER_DEPLOYS_PER_BLOCK
+              value: "32"
+          ports:
+            - name: p2p
+              containerPort: 40400
+            - name: grpc-ext
+              containerPort: 40401
+            - name: grpc-int
+              containerPort: 40402
+            - name: http
+              containerPort: 40403
+            - name: kademlia
+              containerPort: 40404
+            - name: http-admin
+              containerPort: 40405
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rnode
+            - name: conf
+              mountPath: /var/lib/rnode/rnode.conf
+              subPath: rnode.conf
+              readOnly: true
+            - name: bonds
+              mountPath: /var/lib/rnode/genesis/bonds.txt
+              subPath: bonds.txt
+              readOnly: true
+            - name: wallets
+              mountPath: /var/lib/rnode/genesis/wallets.txt
+              subPath: wallets.txt
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: observer-data
+        - name: conf
+          configMap:
+            name: observer-conf
+        - name: bonds
+          configMap:
+            name: bonds
+        - name: wallets
+          configMap:
+            name: wallets

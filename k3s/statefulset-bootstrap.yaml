@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bootstrap
+  namespace: asi-chain
+  labels:
+    app: asi-chain
+    role: bootstrap
+spec:
+  serviceName: bootstrap
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asi-chain
+      role: bootstrap
+  template:
+    metadata:
+      labels:
+        app: asi-chain
+        role: bootstrap
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: bootstrap
+          image: amamata/rust-node:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "run"
+            - "--host=$(NODE_HOST)"
+            - "--bootstrap=rnode://$(BOOTSTRAP_NODE_ID)@$(BOOTSTRAP_HOST)?protocol=40400&discovery=40404"
+            - "--network-id=$(NETWORK_ID)"
+            - "--autopropose"
+            - "--no-upnp"
+          env:
+            - name: NODE_HOST
+              value: "bootstrap-0.bootstrap.asi-chain.svc.cluster.local"
+            - name: BOOTSTRAP_HOST
+              value: "bootstrap-0.bootstrap.asi-chain.svc.cluster.local"
+            - name: NETWORK_ID
+              value: "testnet"
+            - name: BOOTSTRAP_NODE_ID
+              value: "REPLACE_ME"
+            - name: MALLOC_ARENA_MAX
+              value: "2"
+            - name: MALLOC_TRIM_THRESHOLD_
+              value: "131072"
+            - name: MALLOC_MMAP_THRESHOLD_
+              value: "131072"
+            - name: F1R3_MALLOC_TRIM_EVERY_BLOCKS
+              value: "8"
+            - name: F1R3_SYNCHRONY_RECOVERY_STALL_WINDOW_SECONDS
+              value: "8"
+            - name: F1R3_SYNCHRONY_RECOVERY_COOLDOWN_SECONDS
+              value: "20"
+            - name: F1R3_SYNCHRONY_RECOVERY_MAX_BYPASSES
+              value: "3"
+            - name: F1R3_SYNCHRONY_CONSTRAINT_THRESHOLD
+              value: "0"
+            - name: F1R3_SYNCHRONY_FINALIZED_BASELINE_ENABLED
+              value: "1"
+            - name: F1R3_SYNCHRONY_FINALIZED_BASELINE_MAX_DISTANCE
+              value: "64"
+            - name: F1R3_HEARTBEAT_FRONTIER_CHASE_MAX_LAG
+              value: "0"
+            - name: F1R3_HEARTBEAT_SELF_PROPOSE_COOLDOWN_MS
+              value: "15000"
+            - name: F1R3_BLOCK_RETRIEVER_DEDUP_QUERIED_PEERS
+              value: "0"
+            - name: F1R3_BLOCK_RETRIEVER_PEER_REQUERY_COOLDOWN_MS
+              value: "250"
+            - name: F1R3_BLOCK_RETRIEVER_BROADCAST_ONLY_COOLDOWN_MS
+              value: "500"
+            - name: F1R3_BLOCK_RETRIEVER_DEPENDENCY_RECOVERY_COOLDOWN_MS
+              value: "250"
+            - name: F1R3_FIND_DEPLOY_SCAN_DEPTH
+              value: "128"
+            - name: F1R3_BLOCK_RETRIEVER_MAX_RETRIES_PER_HASH
+              value: "64"
+            - name: F1R3_MAIN_PARENT_NEAR_TIP_TOLERANCE
+              value: "0"
+            - name: F1R3_BLOCK_RETRIEVER_KNOWN_PEER_REQUERY_SOFT_LIMIT
+              value: "4"
+            - name: F1R3_BLOCK_RETRIEVER_STALE_REQUEST_LIFETIME_MULTIPLIER
+              value: "3"
+            - name: F1R3_BLOCK_RETRIEVER_MIN_REREQUEST_INTERVAL_MS
+              value: "500"
+            - name: F1R3_MAX_BLOCKS_IN_PROCESSING
+              value: "2048"
+            - name: F1R3_CASPER_BUFFER_MAX_APPROX_NODES
+              value: "16384"
+            - name: F1R3_CASPER_BUFFER_STALE_TTL_MS
+              value: "180000"
+            - name: F1R3_CASPER_BUFFER_MAX_PRUNE_BATCH
+              value: "512"
+            - name: F1R3_CASPER_BUFFER_PRUNE_INTERVAL_MS
+              value: "5000"
+            - name: F1R3_BLOCK_RETRIEVER_RETRY_BUDGET_QUARANTINE_MS
+              value: "120000"
+            - name: F1R3_MISSING_DEPENDENCY_ATTEMPTS_MAX
+              value: "8"
+            - name: F1R3_MISSING_DEPENDENCY_QUARANTINE_MS
+              value: "16000"
+            - name: F1R3_REPLAY_CACHE_MAX_ENTRIES
+              value: "192"
+            - name: F1R3_REPLAY_CACHE_MAX_EVENT_LOG_ENTRIES
+              value: "1536"
+            - name: F1R3_BLOCK_PROTO_DECODE_BUFFER_BYTES
+              value: "65536"
+            - name: F1R3_FINALIZER_WORK_BUDGET_MS
+              value: "8000"
+            - name: F1R3_FINALIZER_STEP_TIMEOUT_MS
+              value: "2000"
+            - name: F1R3_FINALIZER_CATCHUP_WORK_BUDGET_MS
+              value: "8000"
+            - name: F1R3_FINALIZER_CATCHUP_STEP_TIMEOUT_MS
+              value: "2000"
+            - name: F1R3_BLOCK_STORE_DEPLOY_SIG_CACHE_MAX_ENTRIES
+              value: "1024"
+            - name: F1R3_FINALIZER_MAX_CLIQUE_CANDIDATES
+              value: "128"
+            - name: F1R3_FINALIZER_CANDIDATE_RANKING
+              value: "recency_stake"
+            - name: F1R3_MAX_USER_DEPLOYS_PER_BLOCK
+              value: "32"
+          ports:
+            - name: p2p
+              containerPort: 40400
+            - name: grpc-ext
+              containerPort: 40401
+            - name: grpc-int
+              containerPort: 40402
+            - name: http
+              containerPort: 40403
+            - name: kademlia
+              containerPort: 40404
+            - name: http-admin
+              containerPort: 40405
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rnode
+            - name: conf
+              mountPath: /var/lib/rnode/rnode.conf
+              subPath: rnode.conf
+              readOnly: true
+            - name: bonds
+              mountPath: /var/lib/rnode/genesis/bonds.txt
+              subPath: bonds.txt
+              readOnly: true
+            - name: wallets
+              mountPath: /var/lib/rnode/genesis/wallets.txt
+              subPath: wallets.txt
+              readOnly: true
+            - name: tls
+              mountPath: /var/lib/rnode/node.key.pem
+              subPath: node.key.pem
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: bootstrap-data
+        - name: conf
+          configMap:
+            name: bootstrap-conf
+        - name: bonds
+          configMap:
+            name: bonds
+        - name: wallets
+          configMap:
+            name: wallets
+        - name: tls
+          secret:
+            secretName: bootstrap-tls

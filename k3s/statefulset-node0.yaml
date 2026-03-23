@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: validator
+  namespace: asi-chain
+  labels:
+    app: asi-chain
+    role: validator
+spec:
+  serviceName: validator
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asi-chain
+      role: validator
+  template:
+    metadata:
+      labels:
+        app: asi-chain
+        role: validator
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: validator
+          image: amamata/rust-node:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "run"
+          ports:
+            - name: p2p
+              containerPort: 40400
+              protocol: TCP
+            - name: grpc-ext
+              containerPort: 40401
+              protocol: TCP
+            - name: grpc-int
+              containerPort: 40402
+              protocol: TCP
+            - name: http
+              containerPort: 40403
+              protocol: TCP
+            - name: kademlia
+              containerPort: 40404
+              protocol: TCP
+            - name: http-admin
+              containerPort: 40405
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rnode
+            - name: conf
+              mountPath: /var/lib/rnode/rnode.conf
+              subPath: rnode.conf
+              readOnly: true
+            - name: bonds
+              mountPath: /var/lib/rnode/genesis/bonds.txt
+              subPath: bonds.txt
+              readOnly: true
+            - name: common
+              mountPath: /var/lib/rnode/genesis/wallets.txt
+              subPath: wallets.txt
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: validator-data
+        - name: conf
+          configMap:
+            name: validator-conf
+        - name: bonds
+          configMap:
+            name: bonds
+        - name: common
+          configMap:
+            name: common
+      # Pin to a specific k3s node — uncomment and set hostname:
+      # nodeSelector:
+      #   kubernetes.io/hostname: my-server

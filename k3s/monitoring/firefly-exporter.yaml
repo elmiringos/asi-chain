@@ -1,0 +1,303 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: firefly-exporter-script
+  namespace: monitoring
+data:
+  exporter.py: |
+    #!/usr/bin/env python3
+    import os
+    import time
+    import json
+    import urllib.request
+    import urllib.error
+    from prometheus_client import start_http_server, REGISTRY
+    from prometheus_client.core import GaugeMetricFamily
+
+    TARGETS = [
+        ("bootstrap",  "http://bootstrap-0.bootstrap.asi-chain.svc.cluster.local:40403"),
+        ("validator1", "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403"),
+        ("validator2", "http://validator2-0.validator2.asi-chain.svc.cluster.local:40403"),
+        ("validator3", "http://validator3-0.validator3.asi-chain.svc.cluster.local:40403"),
+        ("observer",   "http://observer-0.observer.asi-chain.svc.cluster.local:40403"),
+    ]
+
+    def fetch_json(url, timeout=5):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.loads(r.read())
+        except Exception:
+            return None
+
+    class FireflyCollector:
+        def collect(self):
+            up       = GaugeMetricFamily("firefly_node_up", "1 if the node is reachable", labels=["instance"])
+            peers    = GaugeMetricFamily("firefly_node_peers", "Number of connected peers", labels=["instance"])
+            nodes    = GaugeMetricFamily("firefly_node_discovered_nodes", "Number of discovered nodes", labels=["instance"])
+            latest   = GaugeMetricFamily("firefly_node_latest_block_number", "Latest block number", labels=["instance"])
+            fin_blk  = GaugeMetricFamily("firefly_node_last_finalized_block_number", "Last finalized block number", labels=["instance"])
+            fin_ft   = GaugeMetricFamily("firefly_node_last_finalized_fault_tolerance", "Fault tolerance of last finalized block", labels=["instance"])
+            info     = GaugeMetricFamily("firefly_node_info", "Node version info", labels=["instance", "version", "shard_id"])
+
+            for name, base in TARGETS:
+                status = fetch_json(f"{base}/status")
+                if status is None:
+                    up.add_metric([name], 0)
+                    continue
+
+                up.add_metric([name], 1)
+                peers.add_metric([name], float(status.get("peers", 0)))
+                nodes.add_metric([name], float(status.get("nodes", 0)))
+                version = status.get("version", "")
+
+                blocks = fetch_json(f"{base}/api/blocks")
+                if blocks and isinstance(blocks, list) and blocks:
+                    latest.add_metric([name], float(blocks[0].get("blockNumber", 0)))
+
+                fin = fetch_json(f"{base}/api/last-finalized-block")
+                if fin:
+                    bi = fin.get("blockInfo", {})
+                    fin_blk.add_metric([name], float(bi.get("blockNumber", 0)))
+                    fin_ft.add_metric([name], float(bi.get("faultTolerance", 0)))
+                    info.add_metric([name, version, bi.get("shardId", "")], 1)
+
+            yield up
+            yield peers
+            yield nodes
+            yield latest
+            yield fin_blk
+            yield fin_ft
+            yield info
+
+    if __name__ == "__main__":
+        port = int(os.environ.get("EXPORTER_PORT", "9101"))
+        REGISTRY.register(FireflyCollector())
+        start_http_server(port)
+        print(f"Firefly exporter listening on :{port}", flush=True)
+        while True:
+            time.sleep(60)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-firefly
+  namespace: monitoring
+data:
+  firefly-node-health.json: |
+    {
+      "title": "F1r3fly Node Health",
+      "uid": "firefly-node-health",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Node Status",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "horizontal",
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "DOWN", "color": "red", "index": 0 },
+                    "1": { "text": "UP",   "color": "green", "index": 1 }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            }
+          },
+          "targets": [
+            {
+              "expr": "firefly_node_up",
+              "legendFormat": "{{instance}}",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "id": 2,
+          "title": "Connected Peers",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "fieldConfig": {
+            "defaults": { "custom": { "lineWidth": 2 }, "unit": "short", "min": 0 }
+          },
+          "targets": [
+            {
+              "expr": "firefly_node_peers",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "id": 3,
+          "title": "Discovered Nodes",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "fieldConfig": {
+            "defaults": { "custom": { "lineWidth": 2 }, "unit": "short", "min": 0 }
+          },
+          "targets": [
+            {
+              "expr": "firefly_node_discovered_nodes",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "id": 4,
+          "title": "Latest Block Number",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "fieldConfig": {
+            "defaults": { "custom": { "lineWidth": 2 }, "unit": "short", "min": 0 }
+          },
+          "targets": [
+            {
+              "expr": "firefly_node_latest_block_number",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "id": 5,
+          "title": "Last Finalized Block",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "fieldConfig": {
+            "defaults": { "custom": { "lineWidth": 2 }, "unit": "short", "min": 0 }
+          },
+          "targets": [
+            {
+              "expr": "firefly_node_last_finalized_block_number",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        },
+        {
+          "id": 6,
+          "title": "Fault Tolerance (Last Finalized Block)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "lineWidth": 2 },
+              "unit": "short",
+              "min": -1,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red",    "value": null },
+                  { "color": "yellow", "value": 0 },
+                  { "color": "green",  "value": 0.33 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "firefly_node_last_finalized_fault_tolerance",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "datasource": { "type": "prometheus", "uid": "prometheus" }
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        folder: F1r3fly
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firefly-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: firefly-exporter
+  template:
+    metadata:
+      labels:
+        app: firefly-exporter
+    spec:
+      containers:
+        - name: exporter
+          image: python:3.11-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - "pip install prometheus-client --quiet && python /scripts/exporter.py"
+          ports:
+            - name: metrics
+              containerPort: 9101
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: script
+          configMap:
+            name: firefly-exporter-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: firefly-exporter
+  namespace: monitoring
+spec:
+  selector:
+    app: firefly-exporter
+  ports:
+    - name: metrics
+      port: 9101
+      targetPort: 9101

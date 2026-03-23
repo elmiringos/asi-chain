@@ -1,0 +1,238 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: [nodes, services, endpoints, pods]
+    verbs: [get, list, watch]
+  - nonResourceURLs: [/metrics]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      - /etc/prometheus/rules/prometheus-rules.yml
+
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: [localhost:9090]
+
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: ([^:]+)(?::\d+)?
+            replacement: $1:9100
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_node_name]
+            target_label: node
+
+      - job_name: validators
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - validator1-0.validator1.asi-chain.svc.cluster.local:40403
+              - validator2-0.validator2.asi-chain.svc.cluster.local:40403
+              - validator3-0.validator3.asi-chain.svc.cluster.local:40403
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: "([^.]+).*"
+            target_label: instance
+            replacement: "$1"
+
+      - job_name: bootstrap
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - bootstrap-0.bootstrap.asi-chain.svc.cluster.local:40403
+
+      - job_name: observer
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - observer-0.observer.asi-chain.svc.cluster.local:40403
+
+      - job_name: firefly-exporter
+        static_configs:
+          - targets:
+              - firefly-exporter.monitoring.svc.cluster.local:9101
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  prometheus-rules.yml: |
+    groups:
+      - name: block_transfer_metrics
+        interval: 30s
+        rules:
+          - record: f1r3fly:casper:block_retriever:block_download_end_to_end_time:rate5m
+            expr: rate(f1r3fly_casper_block_retriever_block_download_end_to_end_time_count[5m])
+          - record: f1r3fly:casper:block_retriever:block_download_end_to_end_time:p50
+            expr: histogram_quantile(0.50, sum by (job, instance, le) (rate(f1r3fly_casper_block_retriever_block_download_end_to_end_time_bucket[5m])))
+          - record: f1r3fly:casper:block_retriever:block_download_end_to_end_time:p95
+            expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(f1r3fly_casper_block_retriever_block_download_end_to_end_time_bucket[5m])))
+          - record: f1r3fly:casper:block_retriever:block_download_end_to_end_time:p99
+            expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(f1r3fly_casper_block_retriever_block_download_end_to_end_time_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_validation_time:rate5m
+            expr: rate(f1r3fly_casper_block_processor_block_validation_time_seconds_count[5m])
+          - record: f1r3fly:casper:block_processor:block_validation_time:p50
+            expr: histogram_quantile(0.50, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_validation_time_seconds_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_validation_time:p95
+            expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_validation_time_seconds_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_validation_time:p99
+            expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_validation_time_seconds_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_processing_stage_storage_time:rate5m
+            expr: rate(f1r3fly_casper_block_processor_block_processing_stage_storage_time_seconds_count[5m])
+          - record: f1r3fly:casper:block_processor:block_processing_stage_storage_time:p50
+            expr: histogram_quantile(0.50, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_processing_stage_storage_time_seconds_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_processing_stage_storage_time:p95
+            expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_processing_stage_storage_time_seconds_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_processing_stage_storage_time:p99
+            expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_processing_stage_storage_time_seconds_bucket[5m])))
+          - record: f1r3fly:casper:casper:block_processing_stage_replay_time:rate5m
+            expr: rate(f1r3fly_casper_casper_block_processing_stage_replay_time_count[5m])
+          - record: f1r3fly:casper:casper:block_processing_stage_replay_time:p50
+            expr: histogram_quantile(0.50, sum by (job, instance, le) (rate(f1r3fly_casper_casper_block_processing_stage_replay_time_bucket[5m])))
+          - record: f1r3fly:casper:casper:block_processing_stage_replay_time:p95
+            expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(f1r3fly_casper_casper_block_processing_stage_replay_time_bucket[5m])))
+          - record: f1r3fly:casper:casper:block_processing_stage_replay_time:p99
+            expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(f1r3fly_casper_casper_block_processing_stage_replay_time_bucket[5m])))
+          - record: f1r3fly:casper:block_processor:block_size:avg5m
+            expr: sum by (job, instance) (rate(f1r3fly_casper_block_processor_block_size_sum[5m])) / sum by (job, instance) (rate(f1r3fly_casper_block_processor_block_size_count[5m]))
+          - record: f1r3fly:casper:block_processor:block_size:p95
+            expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(f1r3fly_casper_block_processor_block_size_bucket[5m])))
+          - record: f1r3fly:casper:block_retriever:block_requests_total:rate5m
+            expr: rate(f1r3fly_casper_block_retriever_block_requests_total_total[5m])
+          - record: f1r3fly:casper:block_retriever:block_requests_retries:rate5m
+            expr: rate(f1r3fly_casper_block_retriever_block_requests_retries_total[5m])
+          - record: f1r3fly:casper:block_processor:block_validation:success_rate5m
+            expr: rate(f1r3fly_casper_block_processor_block_validation_success_total[5m]) / (rate(f1r3fly_casper_block_processor_block_validation_success_total[5m]) + rate(f1r3fly_casper_block_processor_block_validation_failed_total[5m])) or (rate(f1r3fly_casper_block_processor_block_validation_success_total[5m]) * 0 + 1)
+          - record: f1r3fly:casper:running:block_hash_received:rate5m
+            expr: rate(f1r3fly_casper_running_block_hash_received_total[5m])
+          - record: f1r3fly:casper:running:block_request_received:rate5m
+            expr: rate(f1r3fly_casper_running_block_request_received_total[5m])
+          - record: f1r3fly:comm:rp:transport:send_time:p95
+            expr: histogram_quantile(0.95, sum by (job, instance, le) (rate(f1r3fly_comm_rp_transport_send_time_seconds_bucket[5m])))
+          - record: f1r3fly:comm:rp:transport:packets_received:rate5m
+            expr: rate(f1r3fly_comm_rp_transport_packets_received_total[5m])
+          - record: f1r3fly:comm:rp:transport:packets_enqueued:rate5m
+            expr: rate(f1r3fly_comm_rp_transport_packets_enqueued_total[5m])
+          - record: f1r3fly:comm:rp:transport:dispatched_packets:rate5m
+            expr: rate(f1r3fly_comm_rp_transport_dispatched_packets_total[5m])
+          - record: f1r3fly:comm:rp:transport:stream_chunks_received:rate5m
+            expr: rate(f1r3fly_comm_rp_transport_stream_chunks_received_total[5m])
+          - record: f1r3fly:comm:rp:transport:stream_chunks_enqueued:rate5m
+            expr: rate(f1r3fly_comm_rp_transport_stream_chunks_enqueued_total[5m])
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: monitoring
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.54.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=7d
+            - --web.enable-lifecycle
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: rules
+              mountPath: /etc/prometheus/rules
+            - name: data
+              mountPath: /prometheus
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: rules
+          configMap:
+            name: prometheus-rules
+        - name: data
+          persistentVolumeClaim:
+            claimName: prometheus-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  type: NodePort
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
+      nodePort: 30090

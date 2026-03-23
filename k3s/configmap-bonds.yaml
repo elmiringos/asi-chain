@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bonds
+  namespace: asi-chain
+data:
+  bonds.txt: |
+    REPLACE_V1_PUBKEY 1000
+    REPLACE_V2_PUBKEY 1000
+    REPLACE_V3_PUBKEY 1000
