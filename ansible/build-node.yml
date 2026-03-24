@@ -29,13 +29,21 @@
         msg: "{{ git_pull.stdout_lines }}"
 
     - name: "Docker build"
-      shell: "DOCKER_REPOSITORY={{ node_image.split('/')[0] }} IMAGE_NAME={{ node_image.split(':')[0].split('/')[-1] }} ./node/docker-commands.sh build-local"
+      shell: "./node/docker-commands.sh build"
       args:
         chdir: "{{ node_repo_dir }}"
+      environment:
+        DOCKER_REPOSITORY: "{{ node_image.split('/')[0] }}"
+        IMAGE_NAME: "{{ node_image.split(':')[0].split('/')[-1] }}"
       register: docker_build
       changed_when: true
+      failed_when: docker_build.rc != 0
       async: 3600
       poll: 30
+
+    - name: "Print build result"
+      debug:
+        msg: "{{ docker_build.stdout_lines }}"
 
     - name: "Docker push"
       shell: "docker push {{ node_image }}"
