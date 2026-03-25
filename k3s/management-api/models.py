@@ -1,6 +1,28 @@
 from pydantic import BaseModel, Field
 
-from domain import ConsensusView, NetworkPartition, NodeChainState, PodStatus, Validator
+from domain import ConsensusView, DeployResult, NetworkPartition, NodeChainState, PodStatus, Validator
+
+
+class HelloWorldRequest(BaseModel):
+    node: str = Field("validator1", description="Node to deploy to")
+    autopropose: bool = Field(True, description="Propose a block after deploy")
+
+
+class TransferRequest(BaseModel):
+    from_addr: str = Field(..., description="Sender REV address")
+    to_addr: str = Field(..., description="Recipient REV address")
+    amount: int = Field(..., gt=0, description="Amount in REV dust")
+    node: str = Field("validator1", description="Node to deploy to")
+    autopropose: bool = Field(True, description="Propose a block after deploy")
+
+
+class DeployResponse(BaseModel):
+    deploy_id: str
+    block_hash: str | None = None
+
+    @classmethod
+    def from_domain(cls, r: DeployResult) -> "DeployResponse":
+        return cls(deploy_id=r.deploy_id, block_hash=r.block_hash)
 
 
 class PartitionRequest(BaseModel):

@@ -6,17 +6,22 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from kubernetes.client.rest import ApiException
 
+import contracts
 import k8s_ops as k8s
-from domain import ConsensusView, NetworkPartition, NodeChainState
+import node_client as nc
+from domain import ConsensusView, DeployResult, NetworkPartition, NodeChainState
 from models import (
     ConsensusHealthResponse,
     ConsensusNodeResponse,
+    DeployResponse,
+    HelloWorldRequest,
     LatencyRequest,
     NodeChainStatusResponse,
     PartitionRequest,
     PartitionResponse,
     PodStatusResponse,
     ThrottleRequest,
+    TransferRequest,
     ValidatorResponse,
 )
 from settings import settings
@@ -200,6 +205,46 @@ async def consensus_health() -> ConsensusHealthResponse:
 async def consensus_lag() -> list[ConsensusNodeResponse]:
     nodes = await _fetch_consensus_states()
     return [ConsensusNodeResponse.from_domain(n) for n in nodes]
+
+
+def _grpc_addr(node: str) -> str:
+    addr = settings.node_grpc_urls.get(node)
+    if not addr:
+        raise HTTPException(status_code=404, detail=f"Unknown node '{node}'")
+    return addr
+
+
+def _deploy_key() -> str:
+    if not settings.deploy_private_key:
+        raise HTTPException(status_code=500, detail="DEPLOY_PRIVATE_KEY is not configured")
+    return settings.deploy_private_key
+
+
+@app.post("/deploy/hello-world", response_model=DeployResponse, tags=["deploy"])
+async def deploy_hello_world(req: HelloWorldRequest) -> DeployResponse:
+    grpc_addr = _grpc_addr(req.node)
+    key = _deploy_key()
+    signed = nc.build_signed_deploy(contracts.HELLO_WORLD, key)
+    try:
+        deploy_id = await nc.do_deploy(grpc_addr, signed)
+        block_hash = await nc.do_propose(grpc_addr) if req.autopropose else None
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    return DeployResponse.from_domain(DeployResult(deploy_id=deploy_id, block_hash=block_hash))
+
+
+@app.post("/deploy/transfer", response_model=DeployResponse, tags=["deploy"])
+async def deploy_transfer(req: TransferRequest) -> DeployResponse:
+    grpc_addr = _grpc_addr(req.node)
+    key = _deploy_key()
+    term = contracts.transfer(req.from_addr, req.to_addr, req.amount)
+    signed = nc.build_signed_deploy(term, key)
+    try:
+        deploy_id = await nc.do_deploy(grpc_addr, signed)
+        block_hash = await nc.do_propose(grpc_addr) if req.autopropose else None
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    return DeployResponse.from_domain(DeployResult(deploy_id=deploy_id, block_hash=block_hash))
 
 
 async def _fetch_consensus_states() -> list[NodeChainState]:

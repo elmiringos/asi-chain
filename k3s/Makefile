@@ -1,5 +1,5 @@
-KUBECTL = kubectl
-NAMESPACE = asi-chain
+KUBECTL    = kubectl
+NAMESPACE  = asi-chain
 AUTOPROPOSE ?= 1
 
 _AUTOPROPOSE_SED = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
@@ -7,10 +7,11 @@ _AUTOPROPOSE_SED = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
 -include .env
 export
 
+
 .PHONY: gen start stop restart status bootstrap-id \
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
-	api-build api-start api-stop
+	api-build api-start api-stop api-secret logs-api
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
 gen:
@@ -93,11 +94,9 @@ start:
 	@echo "==> Done. Check status with: make status"
 
 stop:
-	@echo "==> Deleting PVCs to wipe node data..."
-	@$(KUBECTL) delete pvc --all -n $(NAMESPACE) --ignore-not-found
-	@echo "==> Waiting for PVs to be reclaimed..."
-	@$(KUBECTL) wait pvc --all -n $(NAMESPACE) --for=delete --timeout=120s 2>/dev/null || true
+	@echo "==> Deleting namespace $(NAMESPACE) (terminates pods, wipes PVCs and data)..."
 	@$(KUBECTL) delete namespace $(NAMESPACE) --ignore-not-found
+	@echo "==> Namespace deletion initiated."
 
 restart: stop
 	@echo "Waiting for namespace to be fully deleted..."
@@ -166,3 +165,16 @@ api-start:
 
 api-stop:
 	@$(KUBECTL) delete -f management-api/deploy.yaml --ignore-not-found
+
+api-secret:
+	@if [ -z "$(VALIDATOR1_PRIVATE_KEY)" ]; then \
+		echo "ERROR: VALIDATOR1_PRIVATE_KEY not set. Run 'make gen' first."; exit 1; \
+	fi
+	@$(KUBECTL) create secret generic deploy-keys \
+		-n monitoring \
+		--from-literal=private_key=$(VALIDATOR1_PRIVATE_KEY) \
+		--dry-run=client -o yaml | $(KUBECTL) apply -f -
+	@echo "==> deploy-keys secret updated in monitoring namespace"
+
+logs-api:
+	@$(KUBECTL) logs -n monitoring deployment/management-api -f
