@@ -53,6 +53,13 @@ class Settings(BaseSettings):
         }
 
     @property
+    def node_grpc_int_urls(self) -> dict[str, str]:
+        return {
+            name: url.removeprefix("http://").replace(f":{self.http_port}", f":{self.grpc_int_port}")
+            for name, url in self.node_urls.items()
+        }
+
+    @property
     def non_p2p_ports(self) -> list[int]:
         return [self.grpc_ext_port, self.grpc_int_port, self.http_port, self.http_admin_port]
 
