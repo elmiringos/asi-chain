@@ -3,6 +3,7 @@ import time
 
 import grpc
 import grpc.aio
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -50,7 +51,7 @@ def build_signed_deploy(
 
     hash_bytes = _blake2b256(proto_bytes)
     sk = _secp256k1_key(private_key_hex)
-    sig_der: bytes = sk.sign(hash_bytes, ec.ECDSA(Prehashed()))
+    sig_der: bytes = sk.sign(hash_bytes, ec.ECDSA(Prehashed(hashes.SHA256())))
 
     return casper_pb.DeployDataProto(
         deployer=_public_key_bytes(private_key_hex),
