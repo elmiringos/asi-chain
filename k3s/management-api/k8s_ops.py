@@ -46,11 +46,13 @@ def list_validators() -> list[Validator]:
     result = []
     for sts in sts_list.items:
         raw_role = sts.metadata.labels.get("role", "")
-        try:
-            role = NodeRole(raw_role)
-        except ValueError:
+        if raw_role == NodeRole.BOOTSTRAP:
             continue
-        if role == NodeRole.BOOTSTRAP:
+        elif raw_role == NodeRole.OBSERVER:
+            role = NodeRole.OBSERVER
+        elif raw_role.startswith("validator"):
+            role = NodeRole.VALIDATOR
+        else:
             continue
         result.append(
             Validator(

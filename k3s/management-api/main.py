@@ -178,10 +178,11 @@ async def node_status(name: str) -> NodeChainStatusResponse:
         try:
             resp = await client.get(f"{url}/status")
             data = resp.json()
+            version_info = data.get("version") or {}
             state = NodeChainState(
                 name=name,
                 reachable=True,
-                version=data.get("version"),
+                version=version_info.get("node") if isinstance(version_info, dict) else version_info,
                 peers=data.get("peers"),
                 nodes=data.get("nodes"),
             )

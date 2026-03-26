@@ -11,9 +11,10 @@ COPY . .
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN python -m grpc_tools.protoc -I proto \
-    --python_out=. \
-    --grpc_python_out=. \
+RUN mkdir -p stubs && touch stubs/__init__.py && \
+    python -m grpc_tools.protoc -I proto \
+    --python_out=stubs \
+    --grpc_python_out=stubs \
     proto/CasperMessage.proto \
     proto/ServiceError.proto \
     proto/DeployServiceV1.proto \

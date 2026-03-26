@@ -7,10 +7,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-import CasperMessage_pb2 as casper_pb  # type: ignore[import]
-import DeployServiceV1_pb2_grpc as deploy_grpc  # type: ignore[import]
-import ProposeServiceV1_pb2 as propose_pb  # type: ignore[import]
-import ProposeServiceV1_pb2_grpc as propose_grpc  # type: ignore[import]
+from stubs import CasperMessage_pb2 as casper_pb
+from stubs import DeployServiceV1_pb2_grpc as deploy_grpc
+from stubs import ProposeServiceV1_pb2 as propose_pb
+from stubs import ProposeServiceV1_pb2_grpc as propose_grpc
 
 
 def _blake2b256(data: bytes) -> bytes:
@@ -79,7 +79,7 @@ async def do_deploy(grpc_addr: str, deploy: "casper_pb.DeployDataProto") -> str:
 async def do_propose(grpc_addr: str) -> str:
     async with grpc.aio.insecure_channel(grpc_addr) as channel:
         stub = propose_grpc.ProposeServiceStub(channel)
-        response = await stub.propose(propose_pb.ProposeQuery(is_async=False))
+        response = await stub.propose(propose_pb.ProposeQuery(isAsync=False))
     which = response.WhichOneof("message")
     if which == "error":
         raise ValueError(f"propose failed: {list(response.error.messages)}")
