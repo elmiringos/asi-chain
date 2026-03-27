@@ -62,13 +62,6 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
-          env:
-            - name: DEPLOY_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: deploy-keys
-                  key: private_key
-                  optional: true
           resources:
             requests:
               cpu: 50m

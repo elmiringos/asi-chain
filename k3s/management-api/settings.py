@@ -29,9 +29,6 @@ class Settings(BaseSettings):
     # HTTP client timeout for node status requests (seconds)
     node_request_timeout: float = 5.0
 
-    # secp256k1 private key hex for signing deploys (set via DEPLOY_PRIVATE_KEY env var)
-    deploy_private_key: str = ""
-
     @property
     def node_urls(self) -> dict[str, str]:
         return {
@@ -43,20 +40,6 @@ class Settings(BaseSettings):
             "validator5": self.validator5_url,
             "validator6": self.validator6_url,
             "observer": self.observer_url,
-        }
-
-    @property
-    def node_grpc_urls(self) -> dict[str, str]:
-        return {
-            name: url.removeprefix("http://").replace(f":{self.http_port}", f":{self.grpc_ext_port}")
-            for name, url in self.node_urls.items()
-        }
-
-    @property
-    def node_grpc_int_urls(self) -> dict[str, str]:
-        return {
-            name: url.removeprefix("http://").replace(f":{self.http_port}", f":{self.grpc_int_port}")
-            for name, url in self.node_urls.items()
         }
 
     @property

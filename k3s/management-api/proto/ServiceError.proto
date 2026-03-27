@@ -1,6 +1,0 @@
-syntax = "proto3";
-package servicemodelapi;
-
-message ServiceError {
-  repeated string messages = 1;
-}

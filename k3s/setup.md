@@ -57,9 +57,8 @@ Waits for Grafana rollout, then imports dashboards via `monitoring/import-dashbo
 ### 4. Build and start APIs
 
 ```bash
-sudo make api-build    # builds management-api Docker image, imports into k3s
-sudo make api-secret   # creates deploy-keys secret from VALIDATOR1_PRIVATE_KEY
-sudo make api-start    # deploys the service
+sudo make api-build   # builds management-api Docker image, imports into k3s
+sudo make api-start   # deploys the service
 ```
 
 ---
@@ -168,20 +167,8 @@ All components run in the `monitoring` namespace.
 - **Image**: `management-api:latest` (built from `management-api/Dockerfile`)
 - **NodePort**: 30800
 - **Swagger UI**: `http://<HOST_IP>:30800/docs`
-- **Endpoints**:
-  - `POST /deploy/hello-world` — send a HelloWorld Rholang deploy
-  - `POST /deploy/transfer` — send a token transfer deploy
-- **Auth**: reads `PRIVATE_KEY` from `deploy-keys` secret (namespace: `monitoring`)
 - **Language**: Python (FastAPI)
-
-```bash
-# Quick test
-make deploy-hello-world
-make deploy-hello-world NODE=validator2
-
-make deploy-transfer FROM=<pubkey> TO=<pubkey> AMOUNT=1
-make default-transfer  # validator1 → validator2, amount=1
-```
+- **Capabilities**: validator start/stop/restart, network partitions, node isolation, CPU/memory throttling, latency injection, node chain status, consensus health/lag
 
 ---
 
@@ -203,13 +190,9 @@ make default-transfer  # validator1 → validator2, amount=1
 | `make monitoring-start` | Apply monitoring stack, wait for Grafana, import dashboards |
 | `make monitoring-stop` | Delete `monitoring` namespace |
 | `make api-build` | Build + import management-api image |
-| `make api-secret` | Create `deploy-keys` secret from `VALIDATOR1_PRIVATE_KEY` |
 | `make api-start` | Deploy management-api |
 | `make api-stop` | Delete management-api |
 | `make logs-api` | Follow management-api logs |
-| `make deploy-hello-world` | Send HelloWorld deploy via management-api |
-| `make deploy-transfer FROM=.. TO=.. AMOUNT=..` | Send transfer deploy |
-| `make default-transfer` | Transfer 1 token from validator1 to validator2 |
 
 ---
 

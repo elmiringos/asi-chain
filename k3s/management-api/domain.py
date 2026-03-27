@@ -62,12 +62,6 @@ class NodeChainState:
 
 
 @dataclass
-class DeployResult:
-    deploy_id: str
-    block_hash: str | None = None
-
-
-@dataclass
 class ConsensusView:
     nodes: list[NodeChainState]
 
