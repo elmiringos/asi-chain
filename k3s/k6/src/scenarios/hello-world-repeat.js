@@ -13,6 +13,7 @@
  *   DURATION       — test duration (default: 60s)
  */
 import { deployAndCheck, getValidAfterBlockNumber, HELLO_WORLD_TERM } from "../lib/deploy.js";
+import { annotateTestRun } from "../lib/summary.js";
 
 const NODE_URL = __ENV.NODE_URL || "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403";
 const PRIVATE_KEY = __ENV.PRIVATE_KEY || "";
@@ -38,4 +39,9 @@ export default function ({ validAfterBlockNumber }) {
   for (let i = 0; i < REPEAT; i++) {
     deployAndCheck(NODE_URL, HELLO_WORLD_TERM, validAfterBlockNumber, PRIVATE_KEY, SHARD_ID, `hw-${i + 1}`);
   }
+}
+
+export function handleSummary(data) {
+  annotateTestRun(data, "hello-world-repeat");
+  return {};
 }

@@ -1,5 +1,6 @@
 import { sleep } from "k6";
 import { deployAndCheck, getValidAfterBlockNumber, HELLO_WORLD_TERM, transferTerm } from "./lib/deploy.js";
+import { annotateTestRun } from "./lib/summary.js";
 
 const NODE_URL = __ENV.NODE_URL || "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403";
 const PRIVATE_KEY = __ENV.PRIVATE_KEY || "";
@@ -32,4 +33,9 @@ export default function ({ validAfterBlockNumber }) {
     deployAndCheck(NODE_URL, transferTerm(FROM_ADDR, TO_ADDR, 1), validAfterBlockNumber, PRIVATE_KEY, SHARD_ID, "transfer");
     sleep(2);
   }
+}
+
+export function handleSummary(data) {
+  annotateTestRun(data, "smoke");
+  return {};
 }

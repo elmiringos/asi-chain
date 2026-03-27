@@ -70,6 +70,8 @@ spec:
               mountPath: /etc/grafana/provisioning/dashboards
             - name: dashboard-firefly
               mountPath: /var/lib/grafana/dashboards
+            - name: dashboard-k6-report
+              mountPath: /var/lib/grafana/dashboards/k6-report
             - name: data
               mountPath: /var/lib/grafana
           resources:
@@ -86,9 +88,188 @@ spec:
         - name: dashboard-firefly
           configMap:
             name: grafana-dashboard-firefly
+        - name: dashboard-k6-report
+          configMap:
+            name: grafana-dashboard-k6-report
         - name: data
           persistentVolumeClaim:
             claimName: grafana-data
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-k6-report
+  namespace: monitoring
+data:
+  k6-test-report.json: |
+    {
+      "uid": "k6-test-report",
+      "title": "k6 Test Report",
+      "tags": ["k6"],
+      "refresh": "30s",
+      "time": { "from": "now-24h", "to": "now" },
+      "schemaVersion": 39,
+      "templating": {
+        "list": [
+          {
+            "name": "testid",
+            "label": "Test Run",
+            "type": "query",
+            "datasource": { "uid": "prometheus" },
+            "query": "label_values(k6_http_reqs_total, testid)",
+            "refresh": 2,
+            "sort": 3,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "annotations": {
+        "list": [
+          {
+            "name": "k6 test runs",
+            "datasource": { "uid": "-- Grafana --" },
+            "enable": true,
+            "iconColor": "blue",
+            "tags": ["k6"],
+            "type": "tags"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "type": "row", "title": "Summary"
+        },
+        {
+          "id": 2, "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+          "type": "stat", "title": "Total Deploys",
+          "datasource": { "uid": "prometheus" },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            { "expr": "increase(k6_http_reqs_total{testid=\"$testid\"}[$__range])", "legendFormat": "" }
+          ]
+        },
+        {
+          "id": 3, "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+          "type": "stat", "title": "Success Rate",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{"color": "red","value": 0},{"color": "yellow","value": 0.95},{"color": "green","value": 0.99}] } } },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            { "expr": "1 - (increase(k6_http_req_failed_total{testid=\"$testid\"}[$__range]) / increase(k6_http_reqs_total{testid=\"$testid\"}[$__range]))", "legendFormat": "" }
+          ]
+        },
+        {
+          "id": 4, "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+          "type": "stat", "title": "Blocks Produced",
+          "datasource": { "uid": "prometheus" },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            { "expr": "max(max_over_time(firefly_node_latest_block_number[$__range])) - max(min_over_time(firefly_node_latest_block_number[$__range]))", "legendFormat": "" }
+          ]
+        },
+        {
+          "id": 5, "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+          "type": "stat", "title": "Deploy p95 Latency",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ms" } },
+          "options": { "reduceOptions": { "calcs": ["max"] } },
+          "targets": [
+            { "expr": "k6_http_req_duration_p95{testid=\"$testid\"}", "legendFormat": "" }
+          ]
+        },
+        {
+          "id": 10, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+          "type": "row", "title": "HTTP"
+        },
+        {
+          "id": 11, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+          "type": "timeseries", "title": "Deploy Rate & Errors",
+          "datasource": { "uid": "prometheus" },
+          "targets": [
+            { "expr": "rate(k6_http_reqs_total{testid=\"$testid\"}[1m])", "legendFormat": "req/s" },
+            { "expr": "rate(k6_http_req_failed_total{testid=\"$testid\"}[1m])", "legendFormat": "errors/s" }
+          ]
+        },
+        {
+          "id": 12, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+          "type": "timeseries", "title": "Latency",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ms" } },
+          "targets": [
+            { "expr": "k6_http_req_duration_p50{testid=\"$testid\"}", "legendFormat": "p50" },
+            { "expr": "k6_http_req_duration_p95{testid=\"$testid\"}", "legendFormat": "p95" }
+          ]
+        },
+        {
+          "id": 20, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+          "type": "row", "title": "Deploy Confirmation"
+        },
+        {
+          "id": 21, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "type": "timeseries", "title": "Confirmed vs Unconfirmed",
+          "datasource": { "uid": "prometheus" },
+          "targets": [
+            { "expr": "rate(k6_deploy_confirmed_total{testid=\"$testid\"}[1m])", "legendFormat": "confirmed/s" },
+            { "expr": "rate(k6_deploy_unconfirmed_total{testid=\"$testid\"}[1m])", "legendFormat": "unconfirmed/s" }
+          ]
+        },
+        {
+          "id": 22, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "type": "timeseries", "title": "Confirmation Time",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ms" } },
+          "targets": [
+            { "expr": "k6_deploy_confirmation_ms_p50{testid=\"$testid\"}", "legendFormat": "p50" },
+            { "expr": "k6_deploy_confirmation_ms_p95{testid=\"$testid\"}", "legendFormat": "p95" }
+          ]
+        },
+        {
+          "id": 30, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+          "type": "row", "title": "Node Resources (during test time range)"
+        },
+        {
+          "id": 31, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+          "type": "timeseries", "title": "CPU % by Node",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } },
+          "targets": [
+            { "expr": "100 - (avg by(node) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", "legendFormat": "{{ node }}" }
+          ]
+        },
+        {
+          "id": 32, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+          "type": "timeseries", "title": "Memory % by Node",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } },
+          "targets": [
+            { "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{ node }}" }
+          ]
+        },
+        {
+          "id": 40, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+          "type": "row", "title": "Blockchain"
+        },
+        {
+          "id": 41, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+          "type": "timeseries", "title": "Block Number by Validator",
+          "datasource": { "uid": "prometheus" },
+          "targets": [
+            { "expr": "firefly_node_latest_block_number", "legendFormat": "{{ instance }}" }
+          ]
+        },
+        {
+          "id": 42, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+          "type": "timeseries", "title": "Block Validation Time p95",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "f1r3fly:casper:block_processor:block_validation_time:p95", "legendFormat": "{{ instance }}" }
+          ]
+        }
+      ]
+    }
 ---
 apiVersion: v1
 kind: Service
