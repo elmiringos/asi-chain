@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import time
 
 import grpc
@@ -7,11 +8,14 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from google.protobuf.json_format import MessageToJson
 
 from stubs import CasperMessage_pb2 as casper_pb
 from stubs import DeployServiceV1_pb2_grpc as deploy_grpc
 from stubs import ProposeServiceV1_pb2 as propose_pb
 from stubs import ProposeServiceV1_pb2_grpc as propose_grpc
+
+logger = logging.getLogger(__name__)
 
 
 def _blake2b256(data: bytes) -> bytes:
@@ -49,9 +53,28 @@ def build_signed_deploy(
     )
     proto_bytes: bytes = data_for_signing.SerializeToString()
 
+    logger.info(
+        "deploy signing | signing_proto=%s | proto_bytes=%s",
+        MessageToJson(data_for_signing),
+        proto_bytes.hex(),
+    )
+
     hash_bytes = _blake2b256(proto_bytes)
     sk = _secp256k1_key(private_key_hex)
     sig_der: bytes = sk.sign(hash_bytes, ec.ECDSA(Prehashed(hashes.SHA256())))
+    pub_key_bytes = _public_key_bytes(private_key_hex)
+
+    # Local verification to confirm signing is correct before sending
+    try:
+        sk.public_key().verify(sig_der, hash_bytes, ec.ECDSA(Prehashed(hashes.SHA256())))
+        logger.info(
+            "deploy signing | hash=%s | pubkey=%s | sig=%s | local_verify=OK",
+            hash_bytes.hex(),
+            pub_key_bytes.hex(),
+            sig_der.hex(),
+        )
+    except Exception as e:
+        logger.error("deploy signing | local_verify=FAILED: %s", e)
 
     return casper_pb.DeployDataProto(
         deployer=_public_key_bytes(private_key_hex),

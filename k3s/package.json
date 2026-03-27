@@ -1,0 +1,5 @@
+{
+  "name": "asi-chain-k3s",
+  "private": true,
+  "workspaces": ["sdk", "chain-service"]
+}

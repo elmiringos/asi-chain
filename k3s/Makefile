@@ -11,7 +11,9 @@ export
 .PHONY: gen start stop restart status bootstrap-id \
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
-	api-build api-start api-stop api-secret logs-api
+	api-build api-start api-stop api-secret logs-api logs-chain \
+	deploy-hello-world deploy-transfer default-transfer \
+	k6-build k6-run k6-logs k6-smoke k6-stress k6-confirm k6-clean k6-dashboard
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
 gen:
@@ -149,23 +151,6 @@ monitoring-start:
 monitoring-stop:
 	@$(KUBECTL) delete namespace monitoring --ignore-not-found
 
-api-build:
-	@echo "==> Building management-api image..."
-	@docker build -t management-api:latest management-api/
-	@echo "==> Importing image into k3s..."
-	@docker save management-api:latest | k3s ctr images import -
-
-api-start:
-	@echo "==> Deploying management-api..."
-	@$(KUBECTL) apply -f management-api/deploy.yaml
-	@$(KUBECTL) rollout status deployment/management-api -n monitoring --timeout=60s
-	@echo ""
-	@echo "==> Management API: http://<HOST_IP>:30800"
-	@echo "    Swagger UI:      http://<HOST_IP>:30800/docs"
-
-api-stop:
-	@$(KUBECTL) delete -f management-api/deploy.yaml --ignore-not-found
-
 api-secret:
 	@if [ -z "$(VALIDATOR1_PRIVATE_KEY)" ]; then \
 		echo "ERROR: VALIDATOR1_PRIVATE_KEY not set. Run 'make gen' first."; exit 1; \
@@ -174,7 +159,132 @@ api-secret:
 		-n monitoring \
 		--from-literal=private_key=$(VALIDATOR1_PRIVATE_KEY) \
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@echo "==> deploy-keys secret updated in monitoring namespace"
+	@echo "==> deploy-keys secret created (shared by management-api and chain-service)"
+
+api-build:
+	@echo "==> Building management-api image..."
+	@docker build -t management-api:latest management-api/
+	@docker save management-api:latest | k3s ctr images import -
+	@echo ""
+	@echo "==> Building chain-service image..."
+	@docker build -t chain-service:latest -f chain-service/Dockerfile .
+	@docker save chain-service:latest | k3s ctr images import -
+	@echo ""
+	@echo "==> Both images imported into k3s"
+
+api-start:
+	@echo "==> Deploying management-api..."
+	@$(KUBECTL) apply -f management-api/deploy.yaml
+	@$(KUBECTL) rollout status deployment/management-api -n monitoring --timeout=60s
+	@echo ""
+	@echo "==> Deploying chain-service..."
+	@$(KUBECTL) apply -f chain-service/deploy.yaml
+	@$(KUBECTL) rollout status deployment/chain-service -n monitoring --timeout=60s
+	@echo ""
+	@echo "==> Management API:  http://<HOST_IP>:30800"
+	@echo "    Swagger UI:       http://<HOST_IP>:30800/docs"
+	@echo "    Chain Service:    http://<HOST_IP>:30801"
+
+api-stop:
+	@$(KUBECTL) delete -f management-api/deploy.yaml --ignore-not-found
+	@$(KUBECTL) delete -f chain-service/deploy.yaml --ignore-not-found
 
 logs-api:
 	@$(KUBECTL) logs -n monitoring deployment/management-api -f
+
+logs-chain:
+	@$(KUBECTL) logs -n monitoring deployment/chain-service -f
+
+# --- chain-service deploy shortcuts ---
+# Usage: make deploy-hello-world [NODE=validator1] [AUTOPROPOSE=1]
+#        make deploy-transfer FROM=<addr> TO=<addr> AMOUNT=<int> [NODE=validator1] [AUTOPROPOSE=1]
+CHAIN_HOST ?= localhost
+NODE       ?= validator1
+
+deploy-hello-world:
+	@resp=$$(curl -sS -w '\nHTTP_STATUS:%{http_code}' -X POST http://$(CHAIN_HOST):30801/deploy/hello-world \
+		-H "Content-Type: application/json" \
+		-d '{"node":"$(NODE)","autopropose":$(if $(filter 0,$(AUTOPROPOSE)),false,true)}'); \
+	body=$$(echo "$$resp" | sed '/^HTTP_STATUS:/d'); \
+	code=$$(echo "$$resp" | grep '^HTTP_STATUS:' | cut -d: -f2); \
+	echo "HTTP $$code"; \
+	echo "$$body" | python3 -m json.tool 2>/dev/null || echo "$$body"
+
+deploy-transfer:
+	@if [ -z "$(FROM)" ] || [ -z "$(TO)" ] || [ -z "$(AMOUNT)" ]; then \
+		echo "Usage: make deploy-transfer FROM=<addr> TO=<addr> AMOUNT=<int> [NODE=validator1] [AUTOPROPOSE=1]"; \
+		exit 1; \
+	fi
+	@resp=$$(curl -sS -w '\nHTTP_STATUS:%{http_code}' -X POST http://$(CHAIN_HOST):30801/deploy/transfer \
+		-H "Content-Type: application/json" \
+		-d '{"node":"$(NODE)","from_addr":"$(FROM)","to_addr":"$(TO)","amount":$(AMOUNT),"autopropose":$(if $(filter 0,$(AUTOPROPOSE)),false,true)}'); \
+	body=$$(echo "$$resp" | sed '/^HTTP_STATUS:/d'); \
+	code=$$(echo "$$resp" | grep '^HTTP_STATUS:' | cut -d: -f2); \
+	echo "HTTP $$code"; \
+	echo "$$body" | python3 -m json.tool 2>/dev/null || echo "$$body"
+
+default-transfer:
+	@if [ -z "$(VALIDATOR1_PUBLIC_KEY)" ] || [ -z "$(VALIDATOR2_PUBLIC_KEY)" ]; then \
+		echo "ERROR: VALIDATOR1_PUBLIC_KEY / VALIDATOR2_PUBLIC_KEY not set. Run 'make gen' first."; \
+		exit 1; \
+	fi
+	@$(MAKE) --no-print-directory deploy-transfer \
+		FROM=$(VALIDATOR1_PUBLIC_KEY) TO=$(VALIDATOR2_PUBLIC_KEY) AMOUNT=1
+
+# --- k6 load testing (direct node targeting, no npm/bun on host) ---
+# Usage: make k6-build
+#        make k6-smoke
+#        make k6-run [K6_SCRIPT=hello-world|transfer|smoke] [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
+#        make k6-stress
+K6_VUS      ?= 5
+K6_DURATION ?= 30s
+K6_SCRIPT   ?= hello-world
+K6_NODE     ?= validator1
+
+k6-build:
+	@echo "==> Building k6-tests image (xk6 + Go extension inside Docker)..."
+	@docker build -t k6-tests:latest -f k6/Dockerfile .
+	@docker save k6-tests:latest | k3s ctr images import -
+	@echo "==> k6-tests image imported into k3s"
+
+k6-run:
+	@if [ -z "$(VALIDATOR1_PRIVATE_KEY)" ]; then \
+		echo "ERROR: VALIDATOR1_PRIVATE_KEY not set. Run 'make gen' first."; exit 1; \
+	fi
+	@RUN_ID=$$(date +%s); \
+	NODE_URL="http://$(K6_NODE)-0.$(K6_NODE).$(NAMESPACE).svc.cluster.local:40403"; \
+	SCRIPT_SLUG=$$(echo "$(K6_SCRIPT)" | tr '/' '-'); \
+	JOB_NAME="k6-$$SCRIPT_SLUG-$$RUN_ID"; \
+	sed \
+		-e "s|REPLACE_JOB_NAME|$$JOB_NAME|g" \
+		-e "s|REPLACE_SCRIPT|$(K6_SCRIPT)|g" \
+		-e "s|REPLACE_RUN_ID|$$RUN_ID|g" \
+		-e "s|REPLACE_NODE_URL|$$NODE_URL|g" \
+		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
+		-e "s|REPLACE_FROM_ADDR|$(VALIDATOR1_PUBLIC_KEY)|g" \
+		-e "s|REPLACE_TO_ADDR|$(VALIDATOR2_PUBLIC_KEY)|g" \
+		-e "s|REPLACE_VUS|$(K6_VUS)|g" \
+		-e "s|REPLACE_DURATION|$(K6_DURATION)|g" \
+		k6/job.yaml | $(KUBECTL) apply -f -; \
+	echo "==> Job $$JOB_NAME started"; \
+	echo "    Node: $$NODE_URL"; \
+	echo "    Logs: make k6-logs"
+
+k6-logs:
+	@$(KUBECTL) logs -n monitoring -l app=k6 --tail=200 -f
+
+k6-smoke:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=smoke K6_VUS=1 K6_DURATION=60s
+
+k6-stress:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=hello-world K6_VUS=20 K6_DURATION=5m
+
+k6-confirm:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/confirmed-deploy K6_VUS=2 K6_DURATION=120s
+
+k6-clean:
+	@$(KUBECTL) delete jobs -n monitoring -l app=k6 --ignore-not-found
+
+k6-dashboard:
+	@echo "==> Importing k6 Grafana dashboard..."
+	@bash monitoring/import-dashboards.sh 2>&1 | grep -E "k6|Done|ERROR"

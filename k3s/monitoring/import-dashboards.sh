@@ -44,5 +44,10 @@ else
     echo "         Set F1R3NODE_SCRIPTS env var to point to f1r3node/scripts/"
 fi
 
+echo "==> Importing k6 Load Testing dashboard (grafana.com ID: 19665)..."
+K6_DASH=$(curl -sf "https://grafana.com/api/dashboards/19665/revisions/latest/download")
+grafana_import "$K6_DASH"
+echo "    Done"
+
 echo ""
 echo "==> Dashboards: http://localhost:30080/dashboards"

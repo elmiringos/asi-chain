@@ -28,25 +28,27 @@ on k3s (single-machine Kubernetes). Designed for Byzantine Fault Tolerance (BFT)
 ┌─────────────────────── monitoring namespace ──────────────────────────────────────┐
 │   Prometheus :9090    Grafana :3000    Loki    Promtail                            │
 │   Firefly Exporter :9101   Node Exporter :9100                                    │
-│   Cluster Management API :8000                                                     │
+│   Management API :8000 (Python/FastAPI)                                            │
+│   Chain Service  :8000 (TypeScript/Bun)                                            │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Node Port Mapping
 
-| Node       | HTTP :40403 | gRPC-ext :40401 | gRPC-int :40402 |
-|------------|-------------|-----------------|-----------------|
-| bootstrap  | 30003       | 30001           | 30002           |
-| validator1 | 30013       | 30011           | 30012           |
-| validator2 | 30023       | 30021           | 30022           |
-| validator3 | 30033       | 30031           | 30032           |
-| observer   | 30053       | 30051           | —               |
+| Node       | HTTP :40403 | gRPC-ext :40401 | gRPC-int :40402 | HTTP-admin :40405 |
+|------------|-------------|-----------------|-----------------|-------------------|
+| bootstrap  | 30003       | 30001           | 30002           | —                 |
+| validator1 | 30013       | 30011           | 30012           | —                 |
+| validator2 | 30023       | 30021           | 30022           | —                 |
+| validator3 | 30033       | 30031           | 30032           | —                 |
+| observer   | 30053       | 30051           | —               | —                 |
 
-| Service    | NodePort |
-|------------|----------|
-| Grafana    | 30080    |
-| Prometheus | 30090    |
-| Cluster Management API | 30800 |
+| Service              | NodePort |
+|----------------------|----------|
+| Grafana              | 30080    |
+| Prometheus           | 30090    |
+| Management API       | 30800    |
+| Chain Service        | 30801    |
 
 ---
 
@@ -61,11 +63,12 @@ on k3s (single-machine Kubernetes). Designed for Byzantine Fault Tolerance (BFT)
 
 ### Shared
 - **ConfigMap `bonds`** — validator public keys + stake (genesis, immutable after bootstrap start)
-- **ConfigMap `wallets`** — initial REV balances (genesis, immutable)
+- **ConfigMap `wallets`** — initial ASI balances (genesis, immutable)
 - **Secret `bootstrap-tls`** — EC P-256 key for bootstrap node identity
+- **Secret `deploy-keys`** — `VALIDATOR1_PRIVATE_KEY` shared by Management API and Chain Service
 
 ### Monitoring
-- **Prometheus** — scrapes metrics from all nodes on `:40403/metrics` + node-exporter + firefly-exporter
+- **Prometheus** — scrapes metrics from all nodes on `:40403/metrics` + node-exporter + firefly-exporter. Remote write receiver enabled for k6 metrics ingestion.
 - **Grafana** — dashboards provisioned from ConfigMaps + imported via script
 - **Loki + Promtail** — log aggregation
 - **Node Exporter** — host-level metrics (DaemonSet, hostNetwork: true)
@@ -102,16 +105,16 @@ Active at start:    validator1, validator2, validator3  (in bonds.txt)
 Pool (not running): validator4, validator5, validator6  (also in bonds.txt)
 ```
 
-The Cluster Management API starts/stops pods from this pool — no genesis changes needed.
+The Management API starts/stops pods from this pool — no genesis changes needed.
 
 ---
 
-## Cluster Management API
+## Management API
 
 A FastAPI service (in-cluster, Kubernetes Python SDK) that provides HTTP endpoints
 for controlling the cluster during load/chaos tests.
 
-**Role:** HTTP wrapper over kubectl operations. Enables k6 test scripts to
+**Role:** HTTP wrapper over kubectl operations. Enables test scripts to
 control infrastructure programmatically without direct cluster access.
 
 ### Architecture
@@ -120,7 +123,7 @@ control infrastructure programmatically without direct cluster access.
 k6 test script
     │  HTTP
     ▼
-Cluster Management API (FastAPI + k8s SDK)
+Management API (FastAPI + k8s SDK)     NodePort :30800
     │  kubernetes Python SDK (in-cluster config)
     ▼
 asi-chain namespace (StatefulSets, NetworkPolicies, etc.)
@@ -150,6 +153,10 @@ DELETE /nodes/{name}/throttle        restore original resource limits
 POST   /nodes/{name}/latency         { delay_ms, jitter_ms } → tc qdisc
 DELETE /nodes/{name}/latency         remove tc rules
 
+# Deploy (via HTTP REST, uses DEPLOY_PRIVATE_KEY secret)
+POST   /deploy/hello-world           { node, autopropose }
+POST   /deploy/transfer              { node, from_addr, to_addr, amount, autopropose }
+
 # Observability
 GET    /nodes/{name}/status          proxy to node's /status endpoint
 GET    /consensus/health             finalized block number on all nodes
@@ -157,43 +164,193 @@ GET    /consensus/lag                diff between latest and finalized per node
 GET    /health                       API health check
 ```
 
-### Network Partition Implementation
+### Files
 
-Uses Kubernetes NetworkPolicy to block p2p traffic (ports 40400, 40404) between pod groups.
-Does not affect monitoring, admin, or HTTP API traffic.
-
-```json
-POST /partitions
-{
-  "id": "split-brain",
-  "group_a": ["validator1", "validator2"],
-  "group_b": ["validator3", "validator4"]
-}
+```
+k3s/management-api/
+├── main.py          FastAPI application, route definitions
+├── node_client.py   HTTP REST client for node communication + deploy signing
+├── requirements.txt
+├── Dockerfile
+└── deploy.yaml      Deployment + Service (NodePort :30800)
 ```
 
-Creates a NetworkPolicy per group that allows intra-group traffic and denies cross-group
-traffic on P2P ports. Bootstrap node is never blocked (it's not a validator).
+---
 
-Removing the partition (DELETE /partitions/{id}) deletes the NetworkPolicy → immediate restore.
+## Chain Service
 
-### RBAC
+A lightweight TypeScript/Bun service for submitting blockchain deploys directly to nodes
+via HTTP REST. Stateless, no Kubernetes API access.
 
-ServiceAccount in `monitoring` namespace with permissions on `asi-chain`:
-- `statefulsets` — get, patch, list (scale replicas)
-- `pods` — get, list, delete (restart)
-- `networkpolicies` — get, list, create, delete (partitions)
-- `services`, `configmaps`, `persistentvolumeclaims` — get, list (read-only)
+**Role:** Signs and submits deploys using the ASI-Chain SDK. Exposes two endpoints.
+Accepts a `node` parameter to target a specific validator; falls back to multi-validator
+resubmit when `node` is omitted.
+
+### Architecture
+
+```
+HTTP client / k6 test / curl
+    │  HTTP  NodePort :30801
+    ▼
+Chain Service (Bun + Hono)
+    │  uses asi-chain-sdk
+    ├─ signDeploy (blake2b-256 + secp256k1 DER)
+    ├─ DeployResubmitter (retry across validators)
+    │
+    │  HTTP :40403
+    ▼
+validator1-0 / validator2-0 / validator3-0 (asi-chain namespace)
+```
+
+### API Endpoints
+
+```
+GET  /health
+POST /deploy/hello-world   { node?, autopropose? }
+POST /deploy/transfer      { node?, from_addr, to_addr, amount, autopropose? }
+```
+
+Response: `{ deployId: string, blockHash: string | null }`
 
 ### Files
 
 ```
-k3s/operator/
-├── main.py          FastAPI application, route definitions
-├── models.py        Pydantic request/response schemas
-├── k8s_ops.py       Kubernetes SDK operations
-├── requirements.txt
-├── Dockerfile
-└── deploy.yaml      Namespace resources: SA + RBAC + Deployment + Service
+k3s/chain-service/
+├── src/
+│   ├── index.ts        Hono app, endpoint handlers
+│   └── settings.ts     Node URLs from env vars, DEPLOY_PRIVATE_KEY
+├── Dockerfile          multi-stage: installs sdk workspace → bun run
+└── deploy.yaml         Deployment + Service (NodePort :30801)
+```
+
+---
+
+## ASI-Chain SDK
+
+A local npm package (`k3s/sdk/`) shared between Chain Service (via Bun workspace) and
+k6 tests (via npm `file:` dependency + tsc compilation).
+
+**Design for npm swap:** changing `"asi-chain-sdk": "file:../sdk"` → `"asi-chain-sdk": "^1.0.0"`
+in any consumer's `package.json` is the only change required to switch to a published package.
+
+### Resolution per consumer
+
+| Consumer         | Resolver  | Entry point             |
+|------------------|-----------|-------------------------|
+| chain-service    | Bun       | `"module": "src/index.ts"` (TypeScript source) |
+| k6 Docker build  | npm/esbuild | `"exports": "./dist/index.js"` (compiled JS) |
+
+### Module Structure
+
+```
+k3s/sdk/src/
+├── index.ts                         re-exports all public API
+├── config/index.ts                  ResubmitConfig, DEFAULT_RESUBMIT_CONFIG
+├── domains/
+│   ├── BlockchainGateway/index.ts   singleton, init({ validator, indexer })
+│   ├── Deploy/
+│   │   ├── sign.ts                  signDeploy — blake2b-256 + secp256k1 DER
+│   │   │                            protobuf fields: term=2, ts=3, phloPrice=7,
+│   │   │                            phloLimit=8, validAfterBlock=10, shardId=11
+│   │   └── factory/index.ts         createHelloWorldDeploy(), createTransferDeploy()
+│   └── Wallet/index.ts              Wallet.fromPrivateKey(), Address branded type
+└── services/
+    └── Resubmit/DeployResubmitter.ts
+        resubmit(term, wallet, passwordProvider, propose?)
+        → tries validators in order, retries on failure
+        → NoNewDeploys on propose treated as success
+```
+
+### Deploy Signing Flow
+
+```
+DeployData { term, phloLimit, phloPrice, validAfterBlockNumber, timestamp, shardId }
+    │
+    ├─ serialize → custom protobuf binary encoder (BinaryWriter)
+    │              field numbers match CasperMessage.proto
+    │
+    ├─ hash → blake2b(bytes, null, 32)  (32-byte digest)
+    │
+    └─ sign → secp256k1.sign(hash, { canonical: true })  → DER format
+```
+
+---
+
+## k6 Load Testing
+
+Direct load testing of blockchain nodes — k6 signs deploys using the SDK and sends
+them directly to node HTTP endpoints (`:40403/api/deploy`). Chain Service is not in
+the critical path.
+
+### Architecture
+
+```
+Kubernetes Job (grafana/k6 image, scripts baked in)
+    │  signs deploys using bundled asi-chain-sdk
+    │  HTTP :40403
+    ▼
+validator1-0 / validator2-0 (asi-chain namespace)
+    │
+    │  Prometheus Remote Write
+    ▼
+Prometheus  →  Grafana (dashboard ID: 19665)
+```
+
+### Build Pipeline
+
+```
+Docker multi-stage build (context: k3s/ root, no npm/bun on host):
+
+node:20-slim (builder)
+  1. sdk/: npm install + tsc → sdk/dist/index.js
+  2. k6/:  npm install  (asi-chain-sdk resolves to sdk/dist via "file:../sdk")
+  3. k6/:  esbuild bundles src/*.js → dist/*.js
+           external: ['k6', 'k6/*']  (k6 built-ins provided at runtime)
+
+grafana/k6
+  COPY k6/dist/ → /scripts/
+```
+
+### k6 Scripts
+
+| Script | VUs | Duration | Description |
+|--------|-----|----------|-------------|
+| `smoke.js` | 1 | 60s | Both endpoints sequentially, verifies node reachable |
+| `hello-world.js` | configurable | configurable | POST /api/deploy HelloWorld term |
+| `transfer.js` | configurable | configurable | POST /api/deploy Transfer term (FROM_ADDR, TO_ADDR) |
+
+Each script:
+- Fetches `validAfterBlockNumber` once in `setup()`, reuses across all VUs
+- `autopropose: false` — no propose during load tests, nodes handle internally
+- `sleep(1)` between iterations — blockchain deploys are slow (~1-3s each)
+- Thresholds: `http_req_failed < 5%`, `p(95) < 8000ms`
+
+### Prometheus Integration
+
+k6 pushes metrics via `--out experimental-prometheus-rw` during test execution.
+Each run tagged with `testid=<script>-<timestamp>` for per-run filtering in Grafana.
+
+Key metrics:
+- `k6_http_req_duration_seconds` — deploy latency histogram
+- `k6_http_reqs_total` — throughput (RPS to nodes)
+- `k6_http_req_failed_total` — error rate
+- `k6_vus` — active virtual users
+- `k6_checks_total` — check pass/fail rate
+
+Prometheus retention: 30 days (`--storage.tsdb.retention.time=30d`).
+
+### Files
+
+```
+k3s/k6/
+├── Dockerfile          multi-stage: node:20-slim builder → grafana/k6
+├── package.json        "asi-chain-sdk": "file:../sdk"  ← swap to "^1.0.0" for npm
+├── build.js            esbuild config (external: k6/*)
+├── job.yaml            Kubernetes Job template (REPLACE_* placeholders)
+└── src/
+    ├── hello-world.js
+    ├── transfer.js
+    └── smoke.js
 ```
 
 ---
@@ -205,7 +362,8 @@ k3s/operator/
 ```
 f1r3fly nodes (:40403/metrics)  ──────────┐
 node-exporter (:9100/metrics)   ──────────┤──→ Prometheus ──→ Grafana
-firefly-exporter (:9101/metrics)──────────┘
+firefly-exporter (:9101/metrics)──────────┘        ▲
+k6 Jobs (remote write)          ───────────────────┘
 ```
 
 ### Firefly Exporter Metrics
@@ -216,19 +374,17 @@ Custom Python exporter (polling REST API, not Prometheus metrics):
 |---|---|
 | `firefly_node_up` | `/status` reachable |
 | `firefly_node_peers` | `/status` → peers |
-| `firefly_node_discovered_nodes` | `/status` → nodes |
 | `firefly_node_latest_block_number` | `/api/blocks` → blockNumber |
 | `firefly_node_last_finalized_block_number` | `/api/last-finalized-block` → blockNumber |
 | `firefly_node_last_finalized_fault_tolerance` | `/api/last-finalized-block` → faultTolerance |
-| `firefly_node_info` | version, shardId labels |
 
 ### Grafana Dashboards
 
 | Dashboard | Source |
 |---|---|
-| Node Exporter Full | downloaded from grafana.com (ID: 1860) via import-dashboards.sh |
-| F1r3fly Counter Metrics | generated from live `/metrics` via rnode-metric-counters-to-grafana-dash.sh |
-| F1r3fly Node Health | provisioned from ConfigMap (firefly-exporter metrics) |
+| Node Exporter Full | grafana.com ID: 1860 |
+| F1r3fly Counter Metrics | generated from live `/metrics` |
+| k6 Load Testing Results | grafana.com ID: 19665 — per-run filtering via `testid` tag |
 
 ---
 
@@ -243,13 +399,13 @@ Custom Python exporter (polling REST API, not Prometheus metrics):
 
 | Scenario | Method | Tests |
 |---|---|---|
-| 1 of 3 validators crashes | `/stop` | Liveness with crash fault |
+| 1 of 3 validators crashes | `POST /validators/{name}/stop` | Liveness with crash fault |
 | 2 of 3 validators crash | `/stop` × 2 | Liveness halts (no quorum) |
-| Network split 2+1 | `/partitions` | Minority cannot finalize |
-| Slow validator | `/throttle` | Liveness under resource pressure |
+| Network split 2+1 | `POST /partitions` | Minority cannot finalize |
+| Slow validator | `POST /nodes/{name}/throttle` | Liveness under resource pressure |
 | Node lagging behind | `/stop` → wait → `/start` | Sync / catchup |
-| Rolling restart | `/restart` each | No disruption to finalization |
-| Full partition heal | `/partitions` → DELETE | Recovery after split |
+| Rolling restart | `POST /validators/{name}/restart` | No disruption to finalization |
+| Full partition heal | `POST /partitions` → `DELETE` | Recovery after split |
 
 ### Feasibility of Advanced Techniques
 
@@ -263,87 +419,50 @@ Custom Python exporter (polling REST API, not Prometheus metrics):
 | Toxiproxy | 🟡 Medium | sidecar per validator pod (intercepts :40400) |
 | True Byzantine (equivocation) | 🔴 Hard | requires modified f1r3fly binary |
 
-### Toxiproxy (Phase 2)
-
-Toxiproxy runs as a sidecar container in each validator pod, intercepting P2P traffic:
-```
-external :40400 → toxiproxy sidecar → f1r3fly :40400 (localhost)
-```
-Enables probabilistic packet loss, latency with jitter, bandwidth limiting per node.
-
-### Byzantine Node (Phase 3)
-
-True Byzantine testing (equivocation — node signs two conflicting blocks) requires
-a modified f1r3fly binary with a `--byzantine-mode` flag. Tracked as a separate task
-in f1r3node. Without it, Byzantine behavior can only be approximated via:
-- Selective network isolation (NetworkPolicy)
-- Node that stops proposing (remove `--autopropose`)
-- Node that falls behind and tries to catch up with stale state
-
----
-
-## Load Testing (Phase 2)
-
-### k6 + k6 Operator
-
-k6 Operator provides a CRD-based approach to running load tests:
-```yaml
-apiVersion: k6.io/v1alpha1
-kind: TestRun
-metadata:
-  name: bft-chaos-test
-spec:
-  parallelism: 3
-  script:
-    configMap:
-      name: k6-scripts
-      file: deploy-storm.js
-```
-
-### k6 → Prometheus Integration
-
-k6 supports Prometheus Remote Write output:
-```javascript
-export const options = {
-  ext: { loadimpact: {} }
-};
-// k6 metrics → Prometheus → existing Grafana
-```
-
-### Target Test Flow
-
-```
-k6 script:
-  1. Deploy transactions → validator nodes
-  2. POST /partitions          (split network)
-  3. Continue deploying
-  4. GET /consensus/lag        (assert finalization paused on minority)
-  5. DELETE /partitions/...    (heal network)
-  6. GET /consensus/health     (assert all nodes converge)
-  7. Assert: no safety violation (conflicting finalized blocks)
-```
-
 ---
 
 ## Deployment Workflow
 
 ```bash
 # One-time setup
-make gen                  # generate TLS key, compute bootstrap node ID
+make gen                  # generate TLS key, compute bootstrap node ID, validator keys → .env
 
-# Start network
+# Start blockchain network
 make start                # apply all manifests, wait for bootstrap ready
 
 # Start monitoring
 make monitoring-start     # Prometheus + Grafana + Loki + Firefly Exporter
-                          # auto-imports dashboards after Grafana ready
+                          # auto-imports dashboards (Node Exporter, F1r3fly, k6)
 
-# Start management API (after operator is implemented)
-kubectl apply -f operator/deploy.yaml
+# Build and deploy APIs
+make api-secret           # create deploy-keys Secret from VALIDATOR1_PRIVATE_KEY
+make api-build            # docker build management-api + chain-service → k3s import
+make api-start            # deploy both APIs + rollout status
+
+# Build k6 test image (one-time, rebuild after SDK changes)
+make k6-build             # docker build k6-tests (sdk tsc + esbuild inside Docker) → k3s import
+
+# Run tests
+make k6-smoke             # quick sanity check (1 VU, 60s)
+make k6-run               # hello-world, 5 VUs, 30s (defaults)
+make k6-run K6_SCRIPT=transfer K6_NODE=validator2 K6_VUS=10 K6_DURATION=2m
+make k6-stress            # 20 VUs, 5m
+
+# Quick deploy shortcuts
+make deploy-hello-world   [NODE=validator1] [AUTOPROPOSE=1]
+make deploy-transfer      FROM=<addr> TO=<addr> AMOUNT=<int>
+make default-transfer     # uses VALIDATOR1_PUBLIC_KEY → VALIDATOR2_PUBLIC_KEY, amount=1
+
+# Logs
+make logs-chain           # chain-service logs
+make logs-api             # management-api logs
+make k6-logs              # latest k6 job logs
 
 # Tear down
-make stop                 # delete asi-chain namespace + certs
+make stop                 # delete asi-chain namespace (wipes PVCs)
 make monitoring-stop      # delete monitoring namespace
+make api-stop             # delete management-api + chain-service deployments
+make k6-clean             # delete k6 Jobs (auto-cleanup after 300s via ttl)
 ```
 
 ---
@@ -355,16 +474,18 @@ make monitoring-stop      # delete monitoring namespace
 - [x] TLS key generation + bootstrap node ID derivation (`make gen`)
 - [x] Monitoring stack: Prometheus, Grafana, Loki, Promtail, Node Exporter
 - [x] Firefly Exporter (health + block metrics per node)
-- [x] Grafana dashboard: F1r3fly Node Health (provisioned via ConfigMap)
-- [x] Dashboard auto-import script (`import-dashboards.sh`)
+- [x] Grafana dashboard auto-import (`import-dashboards.sh`)
 - [x] Prometheus recording rules for block transfer metrics
-
-### In Progress
-- [ ] Cluster Management API (Phase 1: crash faults + partitions + throttle)
+- [x] Prometheus remote write receiver (for k6 metrics)
+- [x] Management API (FastAPI): validator lifecycle, partitions, throttle, latency, deploy
+- [x] Chain Service (Bun/Hono): HelloWorld + Transfer deploys via HTTP REST
+- [x] ASI-Chain SDK (`k3s/sdk/`): signDeploy, DeployResubmitter, Wallet, factory
+- [x] k6 load tests: direct node targeting, sdk bundled via esbuild, Kubernetes Jobs
+- [x] k6 → Prometheus remote write → Grafana dashboard (ID: 19665)
 
 ### Planned
-- [ ] Validator pool (extend bonds.txt to 6 validators)
-- [ ] Latency injection via tc/netem (Phase 2)
+- [ ] Validator pool activation (validator4-6)
+- [ ] Latency injection via tc/netem (requires privileged pod)
 - [ ] Toxiproxy sidecar (Phase 2)
-- [ ] k6 load tests + k6 Operator (Phase 2)
 - [ ] Byzantine node mode in f1r3fly binary (Phase 3)
+- [ ] ASI-Chain SDK published to npm

@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: REPLACE_JOB_NAME
+  namespace: monitoring
+  labels:
+    app: k6
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: k6
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: k6-tests:latest
+          imagePullPolicy: Never
+          env:
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+            - name: K6_PROMETHEUS_RW_TREND_STATS
+              value: p(50),p(95),p(99),count,sum
+          args:
+            - run
+            - --env
+            - NODE_URL=REPLACE_NODE_URL
+            - --env
+            - PRIVATE_KEY=REPLACE_PRIVATE_KEY
+            - --env
+            - FROM_ADDR=REPLACE_FROM_ADDR
+            - --env
+            - TO_ADDR=REPLACE_TO_ADDR
+            - --vus
+            - "REPLACE_VUS"
+            - --duration
+            - REPLACE_DURATION
+            - --out
+            - experimental-prometheus-rw
+            - --tag
+            - testid=REPLACE_JOB_NAME
+            - /scripts/REPLACE_SCRIPT.js
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
