@@ -12,7 +12,7 @@ export
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
-	k6-build k6-run k6-logs k6-smoke k6-stress k6-confirm k6-clean k6-dashboard
+	k6-build k6-run k6-logs k6-smoke k6-stress k6-confirm k6-mixed k6-clean k6-dashboard
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
 gen:
@@ -220,6 +220,9 @@ k6-stress:
 
 k6-confirm:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/confirmed-deploy K6_VUS=2 K6_DURATION=120s
+
+k6-mixed:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
 
 k6-clean:
 	@$(KUBECTL) delete jobs -n monitoring -l app=k6 --ignore-not-found

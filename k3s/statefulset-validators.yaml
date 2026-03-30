@@ -23,7 +23,7 @@ spec:
         runAsUser: 0
       containers:
         - name: validator1
-          image: amamata/rust-node:latest
+          image: public.ecr.aws/f6y9h6x4/asi-chain/node:rust-0.1.0
           imagePullPolicy: IfNotPresent
           args:
             - "run"
@@ -201,7 +201,7 @@ spec:
         runAsUser: 0
       containers:
         - name: validator2
-          image: amamata/rust-node:latest
+          image: public.ecr.aws/f6y9h6x4/asi-chain/node:rust-0.1.0
           imagePullPolicy: IfNotPresent
           args:
             - "run"
@@ -379,7 +379,7 @@ spec:
         runAsUser: 0
       containers:
         - name: validator3
-          image: amamata/rust-node:latest
+          image: public.ecr.aws/f6y9h6x4/asi-chain/node:rust-0.1.0
           imagePullPolicy: IfNotPresent
           args:
             - "run"

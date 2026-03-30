@@ -35,6 +35,24 @@ export function getValidAfterBlockNumber(nodeUrl) {
 }
 
 /**
+ * Returns { blockNumber, deployCount } for the latest block.
+ * deployCount comes from LightBlockInfo.deployCount (proto field 18).
+ */
+export function getLatestBlockInfo(nodeUrl) {
+  const res = http.get(`${nodeUrl}/api/blocks/1`);
+  if (res.status !== 200) {
+    console.error(`getLatestBlockInfo: status=${res.status} from ${nodeUrl}`);
+    return { blockNumber: 0, deployCount: 0 };
+  }
+  const blocks = res.json();
+  const b = blocks && blocks[0];
+  return {
+    blockNumber: (b && b.blockNumber) || 0,
+    deployCount: (b && b.deployCount) || 0,
+  };
+}
+
+/**
  * Signs and sends a deploy to a node's /api/deploy endpoint.
  * Returns the k6 response object.
  */

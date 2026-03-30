@@ -1,30 +1,42 @@
 /**
- * Scenario: confirmed-deploy
+ * Scenario: mixed-deploy
  *
- * Sends a HelloWorld deploy and waits until a new block is produced,
- * confirming the deploy was actually included in the blockchain.
+ * Sends HelloWorld and Transfer deploys in the same test run.
+ * Odd-numbered VUs send HelloWorld, even-numbered send Transfer.
+ * Both types are confirmed via waitForBlock and tracked separately.
  *
- * Custom metrics (exported to Prometheus via remote write):
- *   deploy_confirmation_ms  — time from HTTP 200 to new block (Trend)
- *   deploy_confirmed_total  — deploys confirmed in a block (Counter)
- *   deploy_unconfirmed_total — deploys that timed out waiting for a block (Counter)
+ * Custom metrics:
+ *   deploy_confirmation_ms    — confirmation time for all deploy types (Trend)
+ *   deploy_confirmed_total    — confirmed deploys (Counter)
+ *   deploy_unconfirmed_total  — timed-out deploys (Counter)
+ *   block_deploy_count        — deploys per confirmed block (Trend)
  *
  * Env vars:
  *   NODE_URL         — target validator (default: validator1, port 40403)
  *   PRIVATE_KEY      — hex-encoded private key
+ *   FROM_ADDR        — sender address for Transfer deploys
+ *   TO_ADDR          — recipient address for Transfer deploys
+ *   AMOUNT           — transfer amount (default: 1)
  *   SHARD_ID         — shard id (default: root)
  *   CONFIRM_TIMEOUT  — seconds to wait for block confirmation (default: 30)
- *   VUS              — virtual users (default: 2)
- *   DURATION         — test duration (default: 120s)
  */
 import { check, sleep } from "k6";
 import { Trend, Counter } from "k6/metrics";
 import { waitForBlock } from "k6/x/asichain";
-import { sendDeploy, getValidAfterBlockNumber, getLatestBlockInfo, HELLO_WORLD_TERM } from "../lib/deploy.js";
+import {
+  sendDeploy,
+  getValidAfterBlockNumber,
+  getLatestBlockInfo,
+  HELLO_WORLD_TERM,
+  transferTerm,
+} from "../lib/deploy.js";
 import { annotateTestRun } from "../lib/summary.js";
 
 const NODE_URL = __ENV.NODE_URL || "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403";
 const PRIVATE_KEY = __ENV.PRIVATE_KEY || "";
+const FROM_ADDR = __ENV.FROM_ADDR || "";
+const TO_ADDR = __ENV.TO_ADDR || "";
+const AMOUNT = __ENV.AMOUNT ? parseInt(__ENV.AMOUNT) : 1;
 const SHARD_ID = __ENV.SHARD_ID || "root";
 const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT ? parseInt(__ENV.CONFIRM_TIMEOUT) : 30;
 
@@ -34,7 +46,7 @@ const unconfirmedCounter = new Counter("deploy_unconfirmed_total");
 const blockDeployCount = new Trend("block_deploy_count", true);
 
 export const options = {
-  vus: __ENV.VUS ? parseInt(__ENV.VUS) : 2,
+  vus: __ENV.VUS ? parseInt(__ENV.VUS) : 4,
   duration: __ENV.DURATION || "120s",
   thresholds: {
     http_req_failed: ["rate<0.05"],
@@ -45,17 +57,25 @@ export const options = {
 };
 
 export function setup() {
+  if (!FROM_ADDR || !TO_ADDR) {
+    console.warn("setup: FROM_ADDR / TO_ADDR not set — Transfer deploys will be skipped");
+  }
   const blockNumber = getValidAfterBlockNumber(NODE_URL);
-  console.log(`confirmed-deploy: setup blockNumber=${blockNumber}, timeout=${CONFIRM_TIMEOUT}s`);
+  console.log(`mixed-deploy: setup blockNumber=${blockNumber}, timeout=${CONFIRM_TIMEOUT}s`);
   return { validAfterBlockNumber: blockNumber, currentBlockNumber: blockNumber };
 }
 
 export default function ({ validAfterBlockNumber, currentBlockNumber }) {
-  const res = sendDeploy(NODE_URL, HELLO_WORLD_TERM, validAfterBlockNumber, PRIVATE_KEY, SHARD_ID);
+  // Odd VU index → HelloWorld, Even → Transfer
+  const isTransfer = __VU % 2 === 0 && FROM_ADDR && TO_ADDR;
+  const term = isTransfer ? transferTerm(FROM_ADDR, TO_ADDR, AMOUNT) : HELLO_WORLD_TERM;
+  const label = isTransfer ? "transfer" : "hello-world";
+
+  const res = sendDeploy(NODE_URL, term, validAfterBlockNumber, PRIVATE_KEY, SHARD_ID);
 
   const accepted = check(res, {
-    "deploy accepted (200)": (r) => r.status === 200,
-    "deploy has body": (r) => !!r.body && r.body.length > 0,
+    [`${label} accepted (200)`]: (r) => r.status === 200,
+    [`${label} has body`]: (r) => !!r.body && r.body.length > 0,
   });
 
   if (!accepted) {
@@ -74,16 +94,16 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
     if (info.blockNumber === newBlock) {
       blockDeployCount.add(info.deployCount);
     }
-    console.log(`deploy confirmed in block=${newBlock}, confirmation_ms=${elapsed}, deploys_in_block=${info.deployCount}`);
+    console.log(`[${label}] confirmed block=${newBlock}, confirmation_ms=${elapsed}, deploys_in_block=${info.deployCount}`);
   } else {
     unconfirmedCounter.add(1);
-    console.warn(`deploy NOT confirmed within ${CONFIRM_TIMEOUT}s (still at block ${currentBlockNumber})`);
+    console.warn(`[${label}] NOT confirmed within ${CONFIRM_TIMEOUT}s (still at block ${currentBlockNumber})`);
   }
 
   sleep(1);
 }
 
 export function handleSummary(data) {
-  annotateTestRun(data, "confirmed-deploy");
+  annotateTestRun(data, "mixed-deploy");
   return {};
 }
