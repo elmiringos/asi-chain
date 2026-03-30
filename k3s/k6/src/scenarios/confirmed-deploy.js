@@ -88,7 +88,7 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
     confirmedCounter.add(1);
     const info = getLatestBlockInfo(NODE_URL);
     if (info.blockNumber === newBlock) {
-      blockDeployCount.add(info.deployCount);
+      blockDeployCount.add(info.deployCount, { block_number: String(newBlock) });
     }
     blockNumberGauge.add(newBlock);
     if (_lastBlockNumber > 0 && info.blockNumber > _lastBlockNumber && info.timestamp > 0 && _lastBlockTimestamp > 0) {

@@ -150,7 +150,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "increase(k6_http_reqs_total{testid=\"$testid\"}[$__range]) - increase(k6_http_req_failed_total{testid=\"$testid\"}[$__range])",
+              "expr": "increase(k6_deploy_confirmed_total{testid=\"$testid\"}[$__range])",
               "legendFormat": ""
             }
           ]
@@ -167,7 +167,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "increase(k6_http_req_failed_total{testid=\"$testid\"}[$__range])",
+              "expr": "increase(k6_deploy_unconfirmed_total{testid=\"$testid\"}[$__range])",
               "legendFormat": ""
             }
           ]
@@ -185,7 +185,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "max(k6_blockchain_block_number{testid=\"$testid\"}) - min(k6_blockchain_block_number{testid=\"$testid\"})",
+              "expr": "max_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range]) - min_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range])",
               "legendFormat": ""
             }
           ]
@@ -229,18 +229,32 @@ data:
         },
         {
           "id": 6, "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
-          "type": "timeseries", "title": "Deploys per Block over Time",
+          "type": "barchart", "title": "Deploys per Block",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "decimals": 0, "min": 0 } },
-          "options": { "tooltip": { "mode": "single" } },
-          "targets": [
+          "options": {
+            "xField": "block_number",
+            "barWidth": 0.97,
+            "groupWidth": 0.7,
+            "orientation": "auto",
+            "tooltip": { "mode": "single" },
+            "legend": { "displayMode": "hidden" }
+          },
+          "transformations": [
             {
-              "expr": "k6_block_deploy_count_p50{testid=\"$testid\"}",
-              "legendFormat": "p50"
+              "id": "labelsToFields",
+              "options": { "mode": "rows", "valueLabel": "block_number" }
             },
             {
-              "expr": "k6_block_deploy_count_p95{testid=\"$testid\"}",
-              "legendFormat": "p95"
+              "id": "sortBy",
+              "options": { "fields": [{ "desc": false, "displayName": "block_number" }] }
+            }
+          ],
+          "targets": [
+            {
+              "expr": "max by (block_number) (k6_block_deploy_count_max{testid=\"$testid\"})",
+              "instant": true,
+              "legendFormat": "{{block_number}}"
             }
           ]
         },
