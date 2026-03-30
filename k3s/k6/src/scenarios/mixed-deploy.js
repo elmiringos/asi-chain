@@ -7,8 +7,8 @@
  *
  * Custom metrics:
  *   deploy_confirmation_ms    — confirmation time for all deploy types (Trend)
- *   deploy_confirmed_total    — confirmed deploys (Counter)
- *   deploy_unconfirmed_total  — timed-out deploys (Counter)
+ *   deploy_confirmed_total    — confirmed deploys (Counter; k6 name: deploy_confirmed)
+ *   deploy_unconfirmed_total  — timed-out deploys (Counter; k6 name: deploy_unconfirmed)
  *   block_deploy_count        — deploys per confirmed block (Trend)
  *
  * Env vars:
@@ -41,8 +41,8 @@ const SHARD_ID = __ENV.SHARD_ID || "root";
 const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT ? parseInt(__ENV.CONFIRM_TIMEOUT) : 30;
 
 const confirmationTime = new Trend("deploy_confirmation_ms", true);
-const confirmedCounter = new Counter("deploy_confirmed_total");
-const unconfirmedCounter = new Counter("deploy_unconfirmed_total");
+const confirmedCounter = new Counter("deploy_confirmed");
+const unconfirmedCounter = new Counter("deploy_unconfirmed");
 const blockDeployCount = new Trend("block_deploy_count", true);
 const blockNumberGauge = new Gauge("blockchain_block_number");
 const deployPayloadBytes = new Trend("deploy_payload_bytes", true);
@@ -59,7 +59,7 @@ export const options = {
     http_req_failed: ["rate<0.05"],
     http_req_duration: ["p(95)<10000"],
     deploy_confirmation_ms: ["p(95)<30000"],
-    deploy_unconfirmed_total: ["count<5"],
+    deploy_unconfirmed: ["count<5"],
   },
 };
 

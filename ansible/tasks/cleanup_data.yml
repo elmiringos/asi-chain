@@ -1,9 +1,0 @@
-# Wipe data directories. Requires data_dirs variable on the host.
----
-- name: "Clean data directory"
-  shell: "rm -rf {{ item }}/*"
-  loop: "{{ data_dirs }}"
-  loop_control:
-    label: "{{ item }}"
-  failed_when: result.rc != 0
-  register: result

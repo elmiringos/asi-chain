@@ -1,8 +1,0 @@
-# Wait until bootstrap node is accepting connections before starting genesis validators.
----
-- name: "Wait for bootstrap to accept connections"
-  wait_for:
-    host: "127.0.0.1"
-    port: "{{ bootstrap_protocol_port }}"
-    timeout: 60
-    state: started

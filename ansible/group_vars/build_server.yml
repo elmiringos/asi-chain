@@ -1,3 +1,0 @@
-node_repo_dir: ~/f1r3node
-node_image: amamata/rust-node:latest
-node_dockerfile: node/Dockerfile

@@ -185,7 +185,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "max(k6_blockchain_block_number_value{testid=\"$testid\"}) - min(k6_blockchain_block_number_value{testid=\"$testid\"})",
+              "expr": "max(k6_blockchain_block_number{testid=\"$testid\"}) - min(k6_blockchain_block_number{testid=\"$testid\"})",
               "legendFormat": ""
             }
           ]

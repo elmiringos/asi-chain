@@ -6,8 +6,8 @@
  *
  * Custom metrics (exported to Prometheus via remote write):
  *   deploy_confirmation_ms    — time from HTTP 200 to new block (Trend)
- *   deploy_confirmed_total    — deploys confirmed in a block (Counter)
- *   deploy_unconfirmed_total  — deploys that timed out waiting for a block (Counter)
+ *   deploy_confirmed_total    — deploys confirmed in a block (Counter; k6 name: deploy_confirmed)
+ *   deploy_unconfirmed_total  — deploys that timed out (Counter; k6 name: deploy_unconfirmed)
  *   blockchain_block_number   — current block number observed (Gauge); max-min = blocks produced
  *   block_deploy_count        — deploys per confirmed block (Trend); p50/p95/max
  *   deploy_payload_bytes      — HTTP payload size of one deploy (Trend)
@@ -33,8 +33,8 @@ const SHARD_ID = __ENV.SHARD_ID || "root";
 const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT ? parseInt(__ENV.CONFIRM_TIMEOUT) : 30;
 
 const confirmationTime = new Trend("deploy_confirmation_ms", true);
-const confirmedCounter = new Counter("deploy_confirmed_total");
-const unconfirmedCounter = new Counter("deploy_unconfirmed_total");
+const confirmedCounter = new Counter("deploy_confirmed");
+const unconfirmedCounter = new Counter("deploy_unconfirmed");
 const blockDeployCount = new Trend("block_deploy_count", true);
 const blockNumberGauge = new Gauge("blockchain_block_number");
 const deployPayloadBytes = new Trend("deploy_payload_bytes", true);
@@ -51,7 +51,7 @@ export const options = {
     http_req_failed: ["rate<0.05"],
     http_req_duration: ["p(95)<10000"],
     deploy_confirmation_ms: ["p(95)<30000"],
-    deploy_unconfirmed_total: ["count<5"],
+    deploy_unconfirmed: ["count<5"],
   },
 };
 
