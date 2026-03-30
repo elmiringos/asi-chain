@@ -190,7 +190,7 @@ k6-run:
 	@if [ -z "$(VALIDATOR1_PRIVATE_KEY)" ]; then \
 		echo "ERROR: VALIDATOR1_PRIVATE_KEY not set. Run 'make gen' first."; exit 1; \
 	fi
-	@RUN_ID=$$(date +%s); \
+	@RUN_ID=$$(date +%Y-%m-%d-%H-%M-%S); \
 	NODE_URL="http://$(K6_NODE)-0.$(K6_NODE).$(NAMESPACE).svc.cluster.local:40403"; \
 	SCRIPT_SLUG=$$(echo "$(K6_SCRIPT)" | tr '/' '-'); \
 	JOB_NAME="k6-$$SCRIPT_SLUG-$$RUN_ID"; \

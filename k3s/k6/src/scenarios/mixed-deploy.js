@@ -21,7 +21,7 @@
  *   CONFIRM_TIMEOUT  — seconds to wait for block confirmation (default: 30)
  */
 import { check, sleep } from "k6";
-import { Trend, Counter } from "k6/metrics";
+import { Trend, Counter, Gauge } from "k6/metrics";
 import { waitForBlock } from "k6/x/asichain";
 import {
   sendDeploy,
@@ -44,6 +44,13 @@ const confirmationTime = new Trend("deploy_confirmation_ms", true);
 const confirmedCounter = new Counter("deploy_confirmed_total");
 const unconfirmedCounter = new Counter("deploy_unconfirmed_total");
 const blockDeployCount = new Trend("block_deploy_count", true);
+const blockNumberGauge = new Gauge("blockchain_block_number");
+const deployPayloadBytes = new Trend("deploy_payload_bytes", true);
+const blockCreationTime = new Trend("block_creation_time_ms", true);
+
+// per-VU state for block creation time tracking
+let _lastBlockNumber = 0;
+let _lastBlockTimestamp = 0;
 
 export const options = {
   vus: __ENV.VUS ? parseInt(__ENV.VUS) : 4,
@@ -62,6 +69,7 @@ export function setup() {
   }
   const blockNumber = getValidAfterBlockNumber(NODE_URL);
   console.log(`mixed-deploy: setup blockNumber=${blockNumber}, timeout=${CONFIRM_TIMEOUT}s`);
+  blockNumberGauge.add(blockNumber);
   return { validAfterBlockNumber: blockNumber, currentBlockNumber: blockNumber };
 }
 
@@ -72,6 +80,10 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
   const label = isTransfer ? "transfer" : "hello-world";
 
   const res = sendDeploy(NODE_URL, term, validAfterBlockNumber, PRIVATE_KEY, SHARD_ID);
+
+  if (res.request && res.request.body) {
+    deployPayloadBytes.add(res.request.body.length);
+  }
 
   const accepted = check(res, {
     [`${label} accepted (200)`]: (r) => r.status === 200,
@@ -94,6 +106,14 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
     if (info.blockNumber === newBlock) {
       blockDeployCount.add(info.deployCount);
     }
+    blockNumberGauge.add(newBlock);
+    if (_lastBlockNumber > 0 && info.blockNumber > _lastBlockNumber && info.timestamp > 0 && _lastBlockTimestamp > 0) {
+      const timeDiff = info.timestamp - _lastBlockTimestamp;
+      const blocksDiff = info.blockNumber - _lastBlockNumber;
+      blockCreationTime.add(timeDiff / blocksDiff);
+    }
+    _lastBlockNumber = info.blockNumber;
+    _lastBlockTimestamp = info.timestamp;
     console.log(`[${label}] confirmed block=${newBlock}, confirmation_ms=${elapsed}, deploys_in_block=${info.deployCount}`);
   } else {
     unconfirmedCounter.add(1);

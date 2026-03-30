@@ -49,6 +49,7 @@ export function getLatestBlockInfo(nodeUrl) {
   return {
     blockNumber: (b && b.blockNumber) || 0,
     deployCount: (b && b.deployCount) || 0,
+    timestamp: (b && b.timestamp) || 0,
   };
 }
 
