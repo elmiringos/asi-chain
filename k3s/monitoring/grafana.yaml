@@ -70,8 +70,10 @@ spec:
               mountPath: /etc/grafana/provisioning/dashboards
             - name: dashboard-firefly
               mountPath: /var/lib/grafana/dashboards
-            - name: dashboard-k6-report
-              mountPath: /var/lib/grafana/dashboards/k6-report
+            - name: dashboard-k6-perf-report
+              mountPath: /var/lib/grafana/dashboards/k6-perf-report
+            - name: dashboard-k6-http-load
+              mountPath: /var/lib/grafana/dashboards/k6-http-load
             - name: data
               mountPath: /var/lib/grafana
           resources:
@@ -88,9 +90,12 @@ spec:
         - name: dashboard-firefly
           configMap:
             name: grafana-dashboard-firefly
-        - name: dashboard-k6-report
+        - name: dashboard-k6-perf-report
           configMap:
-            name: grafana-dashboard-k6-report
+            name: grafana-dashboard-k6-perf-report
+        - name: dashboard-k6-http-load
+          configMap:
+            name: grafana-dashboard-k6-http-load
         - name: data
           persistentVolumeClaim:
             claimName: grafana-data
@@ -98,13 +103,13 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-dashboard-k6-report
+  name: grafana-dashboard-k6-perf-report
   namespace: monitoring
 data:
-  k6-test-report.json: |
+  k6-perf-report.json: |
     {
-      "uid": "k6-test-report",
-      "title": "k6 Test Report",
+      "uid": "k6-perf-report",
+      "title": "k6 Perf Report",
       "tags": ["k6"],
       "refresh": "30s",
       "time": { "from": "now-24h", "to": "now" },
@@ -230,53 +235,7 @@ data:
           ]
         },
         {
-          "id": 6, "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
-          "type": "barchart", "title": "Deploys per Block",
-          "datasource": { "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "decimals": 0, "min": 0 } },
-          "options": {
-            "xField": "Field",
-            "barWidth": 0.97,
-            "groupWidth": 0.7,
-            "orientation": "auto",
-            "tooltip": { "mode": "single" },
-            "legend": { "displayMode": "hidden" }
-          },
-          "transformations": [
-            {
-              "id": "reduce",
-              "options": { "reducers": ["lastNotNull"] }
-            }
-          ],
-          "targets": [
-            {
-              "expr": "k6_test_block_deploy_count{testid=\"$testid\"}",
-              "instant": true,
-              "legendFormat": "{{block}}"
-            }
-          ]
-        },
-        {
-          "id": 9, "gridPos": { "h": 6, "w": 8, "x": 0, "y": 26 },
-          "type": "stat", "title": "Max Deploys in One Block",
-          "datasource": { "uid": "prometheus" },
-          "fieldConfig": {
-            "defaults": {
-              "decimals": 0,
-              "color": { "mode": "fixed", "fixedColor": "orange" },
-              "thresholds": { "steps": [{ "color": "orange", "value": 0 }] }
-            }
-          },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
-          "targets": [
-            {
-              "expr": "k6_test_max_deploys_per_block{testid=\"$testid\"}",
-              "legendFormat": ""
-            }
-          ]
-        },
-        {
-          "id": 10, "gridPos": { "h": 6, "w": 8, "x": 8, "y": 26 },
+          "id": 10, "gridPos": { "h": 6, "w": 12, "x": 0, "y": 18 },
           "type": "stat", "title": "Deploy Payload Size (avg)",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": {
@@ -296,7 +255,7 @@ data:
           ]
         },
         {
-          "id": 11, "gridPos": { "h": 6, "w": 8, "x": 16, "y": 26 },
+          "id": 11, "gridPos": { "h": 6, "w": 12, "x": 12, "y": 18 },
           "type": "stat", "title": "Block Creation Time (avg)",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": {
@@ -316,7 +275,7 @@ data:
           ]
         },
         {
-          "id": 7, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+          "id": 7, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
           "type": "timeseries", "title": "CPU % by Node",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } },
@@ -328,7 +287,7 @@ data:
           ]
         },
         {
-          "id": 8, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+          "id": 8, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
           "type": "timeseries", "title": "Memory % by Node",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } },
@@ -336,6 +295,155 @@ data:
             {
               "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
               "legendFormat": "{{ node }}"
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-k6-http-load
+  namespace: monitoring
+data:
+  k6-http-load.json: |
+    {
+      "uid": "k6-http-load",
+      "title": "k6 HTTP Load",
+      "tags": ["k6"],
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "schemaVersion": 39,
+      "templating": {
+        "list": [
+          {
+            "name": "testid",
+            "label": "Test Run",
+            "type": "query",
+            "datasource": { "uid": "prometheus" },
+            "query": "label_values(k6_http_reqs_total, testid)",
+            "refresh": 2,
+            "sort": 4,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1, "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "type": "stat", "title": "Total Requests",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "blue" },
+              "thresholds": { "steps": [{ "color": "blue", "value": 0 }] }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "targets": [
+            {
+              "expr": "k6_http_reqs_total{testid=\"$testid\"}",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "id": 2, "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "type": "stat", "title": "Failure Rate",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": 0 },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.05 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "targets": [
+            {
+              "expr": "k6_http_req_failed{testid=\"$testid\"}",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "id": 3, "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "type": "stat", "title": "p95 Request Duration",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": 0 },
+                  { "color": "yellow", "value": 1000 },
+                  { "color": "red", "value": 5000 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "targets": [
+            {
+              "expr": "k6_http_req_duration_p95{testid=\"$testid\"}",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "id": 4, "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "type": "stat", "title": "Active VUs",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "purple" },
+              "thresholds": { "steps": [{ "color": "purple", "value": 0 }] }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "targets": [
+            {
+              "expr": "k6_vus{testid=\"$testid\"}",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "id": 5, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "type": "timeseries", "title": "Requests per Second",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "min": 0 } },
+          "targets": [
+            {
+              "expr": "rate(k6_http_reqs_total{testid=\"$testid\"}[1m])",
+              "legendFormat": "rps"
+            }
+          ]
+        },
+        {
+          "id": 6, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "type": "timeseries", "title": "Request Duration",
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ms", "min": 0 } },
+          "targets": [
+            {
+              "expr": "k6_http_req_duration_p50{testid=\"$testid\"}",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "k6_http_req_duration_p95{testid=\"$testid\"}",
+              "legendFormat": "p95"
             }
           ]
         }

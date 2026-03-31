@@ -246,7 +246,6 @@ data:
     apiVersion: 1
     providers:
       - name: default
-        folder: F1r3fly
         type: file
         disableDeletion: false
         updateIntervalSeconds: 30

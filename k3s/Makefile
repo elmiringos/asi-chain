@@ -12,7 +12,7 @@ export
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
-	k6-build k6-run k6-logs k6-smoke k6-stress k6-confirm k6-mixed k6-clean k6-dashboard
+	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-clean k6-dashboard
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
 gen:
@@ -173,9 +173,12 @@ logs-api:
 
 # --- k6 load testing (direct node targeting, no npm/bun on host) ---
 # Usage: make k6-build
-#        make k6-smoke
-#        make k6-run [K6_SCRIPT=hello-world|transfer|smoke] [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
-#        make k6-stress
+#        make k6-hello-world          (unconfirmed, throughput)
+#        make k6-transfer             (unconfirmed, throughput)
+#        make k6-confirm-hello        (confirmed, block metrics)
+#        make k6-confirm-transfer     (confirmed, block metrics)
+#        make k6-mixed                (confirmed HelloWorld + Transfer)
+#        make k6-run K6_SCRIPT=... [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
 K6_VUS      ?= 5
 K6_DURATION ?= 30s
 K6_SCRIPT   ?= hello-world
@@ -213,14 +216,17 @@ k6-run:
 k6-logs:
 	@$(KUBECTL) logs -n monitoring -l app=k6 --tail=200 -f
 
-k6-smoke:
-	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=smoke K6_VUS=1 K6_DURATION=60s
+k6-hello-world:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=hello-world K6_VUS=5 K6_DURATION=60s
 
-k6-stress:
-	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=hello-world K6_VUS=20 K6_DURATION=5m
+k6-transfer:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=transfer K6_VUS=5 K6_DURATION=60s
 
-k6-confirm:
-	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/confirmed-deploy K6_VUS=2 K6_DURATION=120s
+k6-confirm-hello:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/confirmed-hello-world K6_VUS=2 K6_DURATION=120s
+
+k6-confirm-transfer:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/confirmed-transfer K6_VUS=2 K6_DURATION=120s
 
 k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s

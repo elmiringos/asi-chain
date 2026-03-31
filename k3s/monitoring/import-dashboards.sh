@@ -33,21 +33,5 @@ NODE_DASH=$(curl -sf "https://grafana.com/api/dashboards/1860/revisions/latest/d
 grafana_import "$NODE_DASH"
 echo "    Done"
 
-SCRIPT="$SCRIPT_DIR/rnode-metric-counters-to-grafana-dash.sh"
-if [ -f "$SCRIPT" ]; then
-    echo "==> Generating F1r3fly dashboard from $OBSERVER_METRICS_URL..."
-    F1R3_DASH=$(bash "$SCRIPT" "$OBSERVER_METRICS_URL")
-    grafana_import "$F1R3_DASH"
-    echo "    Done"
-else
-    echo "WARNING: $SCRIPT not found, skipping F1r3fly dashboard"
-    echo "         Set F1R3NODE_SCRIPTS env var to point to f1r3node/scripts/"
-fi
-
-echo "==> Importing k6 Load Testing dashboard (grafana.com ID: 19665)..."
-K6_DASH=$(curl -sf "https://grafana.com/api/dashboards/19665/revisions/latest/download")
-grafana_import "$K6_DASH"
-echo "    Done"
-
 echo ""
 echo "==> Dashboards: http://localhost:30080/dashboards"
