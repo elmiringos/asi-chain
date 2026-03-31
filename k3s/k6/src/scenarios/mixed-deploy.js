@@ -29,6 +29,7 @@ import {
   getLatestBlockInfo,
   HELLO_WORLD_TERM,
   transferTerm,
+  estimateDeployProtoSize,
 } from "../lib/deploy.js";
 import { annotateTestRun } from "../lib/summary.js";
 import { pushReport } from "../lib/report.js";
@@ -83,7 +84,7 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
   const res = sendDeploy(NODE_URL, term, validAfterBlockNumber, PRIVATE_KEY, SHARD_ID);
 
   if (res.request && res.request.body) {
-    deployPayloadBytes.add(res.request.body.length);
+    deployPayloadBytes.add(estimateDeployProtoSize(JSON.parse(res.request.body)));
   }
 
   const accepted = check(res, {

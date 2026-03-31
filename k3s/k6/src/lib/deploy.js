@@ -89,6 +89,67 @@ export function sendDeploy(nodeUrl, term, validAfterBlockNumber, privateKey, sha
 }
 
 /**
+ * Estimates the protobuf byte size of a DeployDataProto message.
+ *
+ * Proto definition (CasperMessage.proto):
+ *   deployer(1)=bytes, term(2)=string, timestamp(3)=int64,
+ *   sig(4)=bytes, sigAlgorithm(5)=string, phloPrice(7)=int64,
+ *   phloLimit(8)=int64, validAfterBlockNumber(10)=int64,
+ *   shardId(11)=string, language(12)=string
+ *
+ * @param {Object} body - parsed JSON body sent to /api/deploy
+ * @returns {number} estimated protobuf byte size
+ */
+export function estimateDeployProtoSize(body) {
+  const d = body.data || {};
+
+  // Number of bytes needed to encode n as a protobuf varint
+  function varintSize(n) {
+    if (!n || n === 0) return 0;
+    if (n < 0x80) return 1;
+    if (n < 0x4000) return 2;
+    if (n < 0x200000) return 3;
+    if (n < 0x10000000) return 4;
+    if (n < 0x800000000) return 5;
+    if (n < 0x40000000000) return 6;
+    return 7; // sufficient for JS safe integers
+  }
+
+  // tag(1 byte, all our fields are ≤ 15) + varint(len) + bytes
+  function strField(s) {
+    if (!s || s.length === 0) return 0;
+    return 1 + varintSize(s.length) + s.length;
+  }
+
+  // tag(1 byte) + varint(byteLen) + bytes; input is hex string
+  function bytesField(hex) {
+    if (!hex) return 0;
+    const byteLen = hex.replace(/^0x/, "").length >> 1;
+    if (byteLen === 0) return 0;
+    return 1 + varintSize(byteLen) + byteLen;
+  }
+
+  // tag(1 byte) + varint(value); proto3 omits field if value is 0
+  function int64Field(n) {
+    if (!n || n === 0) return 0;
+    return 1 + varintSize(n);
+  }
+
+  return (
+    bytesField(body.deployer) +                  // field  1: deployer
+    strField(d.term) +                           // field  2: term (dominant)
+    int64Field(d.timestamp) +                    // field  3: timestamp
+    bytesField(body.signature) +                 // field  4: sig
+    strField(body.sigAlgorithm) +                // field  5: sigAlgorithm
+    int64Field(d.phloPrice) +                    // field  7: phloPrice
+    int64Field(d.phloLimit) +                    // field  8: phloLimit
+    int64Field(d.validAfterBlockNumber) +        // field 10: validAfterBlockNumber
+    strField(d.shardId) +                        // field 11: shardId
+    9                                            // field 12: language="rholang" (1+1+7)
+  );
+}
+
+/**
  * Sends a deploy and runs standard checks. Returns true if successful.
  */
 export function deployAndCheck(nodeUrl, term, validAfterBlockNumber, privateKey, shardId, label = "deploy") {

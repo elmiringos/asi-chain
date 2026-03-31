@@ -5,25 +5,33 @@ const PUSHGATEWAY_URL =
 
 /**
  * Fetches the last `count` blocks from the node and returns those
- * with blockNumber >= startBlock, sorted ascending.
+ * with startBlock <= blockNumber <= endBlock, sorted ascending.
  */
-function fetchBlocks(nodeUrl, startBlock, count) {
+function fetchBlocks(nodeUrl, startBlock, endBlock, count) {
   const res = http.get(`${nodeUrl}/api/blocks/${count}`);
   if (res.status !== 200) {
     console.warn(`fetchBlocks: status=${res.status}`);
     return [];
   }
-  const blocks = res.json();
-  if (!Array.isArray(blocks)) return [];
+  const raw = res.json();
+  if (!Array.isArray(raw)) return [];
+
+  // Log a sample to diagnose field names in the API response
+  if (raw.length > 0) {
+    const sample = raw[0];
+    console.log(`fetchBlocks sample: keys=${Object.keys(sample).join(",")}, blockNumber=${sample.blockNumber}, deployCount=${sample.deployCount}`);
+  }
 
   // API may return duplicate block entries — keep first occurrence per blockNumber
   const seen = new Map();
-  for (const b of blocks) {
-    if (b.blockNumber >= startBlock && !seen.has(b.blockNumber)) {
+  for (const b of raw) {
+    if (b.blockNumber >= startBlock && b.blockNumber <= endBlock && !seen.has(b.blockNumber)) {
       seen.set(b.blockNumber, b);
     }
   }
-  return Array.from(seen.values()).sort((a, b) => a.blockNumber - b.blockNumber);
+  const result = Array.from(seen.values()).sort((a, b) => a.blockNumber - b.blockNumber);
+  console.log(`fetchBlocks: range=[${startBlock}..${endBlock}], matched=${result.length}, deployCounts=${result.map((b) => `${b.blockNumber}:${b.deployCount}`).join(" ")}`);
+  return result;
 }
 
 /**
@@ -58,7 +66,7 @@ export function pushReport(data, scriptName, nodeUrl) {
 
   // Fetch per-block data from chain (add buffer to handle forks/skipped blocks)
   const fetchCount = blocksProduced > 0 ? blocksProduced + 20 : 0;
-  const blocks = fetchCount > 0 ? fetchBlocks(nodeUrl, startBlock, fetchCount) : [];
+  const blocks = fetchCount > 0 ? fetchBlocks(nodeUrl, startBlock, endBlock, fetchCount) : [];
 
   // Block statistics from chain data
   const deployCounts = blocks.map((b) => b.deployCount || 0);
