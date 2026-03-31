@@ -36,7 +36,7 @@ const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT ? parseInt(__ENV.CONFIRM_TIMEOUT) 
 const confirmationTime = new Trend("deploy_confirmation_ms", true);
 const confirmedCounter = new Counter("deploy_confirmed");
 const unconfirmedCounter = new Counter("deploy_unconfirmed");
-const blockDeployCount = new Trend("block_deploy_count", true);
+const blockDeployCounter = new Counter("block_deploys");
 const blockNumberGauge = new Gauge("blockchain_block_number");
 const deployPayloadBytes = new Trend("deploy_payload_bytes", true);
 const blockCreationTime = new Trend("block_creation_time_ms", true);
@@ -89,7 +89,7 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
     confirmedCounter.add(1);
     const info = getLatestBlockInfo(NODE_URL);
     if (info.blockNumber === newBlock) {
-      blockDeployCount.add(info.deployCount, { block_number: String(newBlock) });
+      blockDeployCounter.add(1, { block_number: String(newBlock) });
     }
     blockNumberGauge.add(newBlock);
     if (_lastBlockNumber > 0 && info.blockNumber > _lastBlockNumber && info.timestamp > 0 && _lastBlockTimestamp > 0) {
