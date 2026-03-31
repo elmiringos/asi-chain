@@ -185,7 +185,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "max_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range]) - min_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range])",
+              "expr": "max(max_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range])) - min(min_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range]))",
               "legendFormat": ""
             }
           ]
@@ -222,7 +222,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "k6_block_deploy_count_sum{testid=\"$testid\"} / k6_block_deploy_count_count{testid=\"$testid\"}",
+              "expr": "avg(k6_block_deploy_count_p50{testid=\"$testid\"})",
               "legendFormat": ""
             }
           ]
@@ -233,7 +233,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "decimals": 0, "min": 0 } },
           "options": {
-            "xField": "block_number",
+            "xField": "Field",
             "barWidth": 0.97,
             "groupWidth": 0.7,
             "orientation": "auto",
@@ -242,12 +242,8 @@ data:
           },
           "transformations": [
             {
-              "id": "labelsToFields",
-              "options": { "mode": "rows", "valueLabel": "block_number" }
-            },
-            {
-              "id": "sortBy",
-              "options": { "fields": [{ "desc": false, "displayName": "block_number" }] }
+              "id": "reduce",
+              "options": { "reducers": ["lastNotNull"] }
             }
           ],
           "targets": [
@@ -272,7 +268,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "k6_block_deploy_count_max{testid=\"$testid\"}",
+              "expr": "max(k6_block_deploy_count_max{testid=\"$testid\"})",
               "legendFormat": ""
             }
           ]
