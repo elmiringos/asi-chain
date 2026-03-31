@@ -15,7 +15,7 @@ data:
       no-upnp = true
       port = 40400
       grpc-max-recv-message-size = 256K
-      grpc-max-recv-stream-message-size = 256M
+      grpc-max-recv-stream-message-size = 512M
       max-message-consumers = 400
       disable-state-exporter = false
     }

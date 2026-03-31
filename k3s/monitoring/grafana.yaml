@@ -276,25 +276,25 @@ data:
         },
         {
           "id": 7, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-          "type": "timeseries", "title": "CPU % by Node",
+          "type": "timeseries", "title": "CPU Cores Used by Pod",
           "datasource": { "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } },
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "min": 0, "custom": { "lineWidth": 2 } } },
           "targets": [
             {
-              "expr": "100 - (avg by(node) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
-              "legendFormat": "{{ node }}"
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"asi-chain\", pod=~\"validator.*|bootstrap.*|observer.*\", container!=\"\", container!=\"POD\"}[1m])",
+              "legendFormat": "{{ pod }}"
             }
           ]
         },
         {
           "id": 8, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-          "type": "timeseries", "title": "Memory % by Node",
+          "type": "timeseries", "title": "Memory by Pod",
           "datasource": { "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } },
+          "fieldConfig": { "defaults": { "unit": "bytes", "min": 0, "custom": { "lineWidth": 2 } } },
           "targets": [
             {
-              "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
-              "legendFormat": "{{ node }}"
+              "expr": "container_memory_working_set_bytes{namespace=\"asi-chain\", pod=~\"validator.*|bootstrap.*|observer.*\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{ pod }}"
             }
           ]
         }
