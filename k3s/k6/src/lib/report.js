@@ -15,9 +15,15 @@ function fetchBlocks(nodeUrl, startBlock, count) {
   }
   const blocks = res.json();
   if (!Array.isArray(blocks)) return [];
-  return blocks
-    .filter((b) => b.blockNumber >= startBlock)
-    .sort((a, b) => a.blockNumber - b.blockNumber);
+
+  // API may return duplicate block entries — keep first occurrence per blockNumber
+  const seen = new Map();
+  for (const b of blocks) {
+    if (b.blockNumber >= startBlock && !seen.has(b.blockNumber)) {
+      seen.set(b.blockNumber, b);
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => a.blockNumber - b.blockNumber);
 }
 
 /**

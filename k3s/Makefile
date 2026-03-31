@@ -136,6 +136,7 @@ monitoring-start:
 	@$(KUBECTL) apply -f monitoring/loki.yaml
 	@$(KUBECTL) apply -f monitoring/promtail.yaml
 	@$(KUBECTL) apply -f monitoring/firefly-exporter.yaml
+	@$(KUBECTL) apply -f monitoring/pushgateway.yaml
 	@$(KUBECTL) apply -f monitoring/grafana.yaml
 	@echo ""
 	@echo "==> Waiting for Grafana to be ready..."
