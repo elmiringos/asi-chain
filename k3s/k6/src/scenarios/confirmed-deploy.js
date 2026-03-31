@@ -26,6 +26,7 @@ import { Trend, Counter, Gauge } from "k6/metrics";
 import { waitForBlock } from "k6/x/asichain";
 import { sendDeploy, getValidAfterBlockNumber, getLatestBlockInfo, HELLO_WORLD_TERM } from "../lib/deploy.js";
 import { annotateTestRun } from "../lib/summary.js";
+import { pushReport } from "../lib/report.js";
 
 const NODE_URL = __ENV.NODE_URL || "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403";
 const PRIVATE_KEY = __ENV.PRIVATE_KEY || "";
@@ -109,5 +110,6 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
 
 export function handleSummary(data) {
   annotateTestRun(data, "confirmed-deploy");
+  pushReport(data, "confirmed-deploy", NODE_URL);
   return {};
 }

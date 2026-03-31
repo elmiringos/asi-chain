@@ -87,6 +87,12 @@ data:
         static_configs:
           - targets:
               - firefly-exporter.monitoring.svc.cluster.local:9101
+
+      - job_name: pushgateway
+        honor_labels: true
+        static_configs:
+          - targets:
+              - pushgateway.monitoring.svc.cluster.local:9091
 ---
 apiVersion: v1
 kind: ConfigMap

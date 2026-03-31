@@ -38,6 +38,8 @@ spec:
             - REPLACE_DURATION
             - --out
             - experimental-prometheus-rw
+            - --env
+            - TESTID=REPLACE_JOB_NAME
             - --tag
             - testid=REPLACE_JOB_NAME
             - /scripts/REPLACE_SCRIPT.js

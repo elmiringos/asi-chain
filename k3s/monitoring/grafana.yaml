@@ -116,7 +116,7 @@ data:
             "label": "Test Run",
             "type": "query",
             "datasource": { "uid": "prometheus" },
-            "query": "label_values(k6_http_reqs_total, testid)",
+            "query": "label_values(k6_test_confirmed_total, testid)",
             "refresh": 2,
             "sort": 4,
             "includeAll": false,
@@ -150,7 +150,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "increase(k6_deploy_confirmed_total{testid=\"$testid\"}[$__range])",
+              "expr": "k6_test_confirmed_total{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
@@ -167,7 +167,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "increase(k6_deploy_unconfirmed_total{testid=\"$testid\"}[$__range])",
+              "expr": "k6_test_unconfirmed_total{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
@@ -185,25 +185,27 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "max(max_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range])) - min(min_over_time(k6_blockchain_block_number{testid=\"$testid\"}[$__range]))",
+              "expr": "k6_test_blocks_produced{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
         },
         {
           "id": 4, "gridPos": { "h": 6, "w": 12, "x": 0, "y": 12 },
-          "type": "stat", "title": "Confirmed Deploys",
+          "type": "stat", "title": "p95 Confirmation Time",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "fixed", "fixedColor": "green" },
-              "thresholds": { "steps": [{ "color": "green", "value": 0 }] }
+              "unit": "ms",
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "yellow" },
+              "thresholds": { "steps": [{ "color": "yellow", "value": 0 }] }
             }
           },
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "increase(k6_deploy_confirmed_total{testid=\"$testid\"}[$__range])",
+              "expr": "k6_test_confirmation_p95_ms{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
@@ -222,7 +224,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "avg(k6_block_deploy_count_p50{testid=\"$testid\"})",
+              "expr": "k6_test_avg_deploys_per_block{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
@@ -248,9 +250,9 @@ data:
           ],
           "targets": [
             {
-              "expr": "max by (block_number) (k6_block_deploy_count_max{testid=\"$testid\"})",
+              "expr": "k6_test_block_deploy_count{testid=\"$testid\"}",
               "instant": true,
-              "legendFormat": "{{block_number}}"
+              "legendFormat": "{{block}}"
             }
           ]
         },
@@ -268,14 +270,14 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "max(k6_block_deploy_count_max{testid=\"$testid\"})",
+              "expr": "k6_test_max_deploys_per_block{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
         },
         {
           "id": 10, "gridPos": { "h": 6, "w": 8, "x": 8, "y": 26 },
-          "type": "stat", "title": "Deploy Payload Size (p50)",
+          "type": "stat", "title": "Deploy Payload Size (avg)",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -288,14 +290,14 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "k6_deploy_payload_bytes_p50{testid=\"$testid\"}",
+              "expr": "k6_test_payload_bytes_avg{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
         },
         {
           "id": 11, "gridPos": { "h": 6, "w": 8, "x": 16, "y": 26 },
-          "type": "stat", "title": "Block Creation Time (p50)",
+          "type": "stat", "title": "Block Creation Time (avg)",
           "datasource": { "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -308,7 +310,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "k6_block_creation_time_ms_p50{testid=\"$testid\"}",
+              "expr": "k6_test_avg_block_creation_time_ms{testid=\"$testid\"}",
               "legendFormat": ""
             }
           ]
