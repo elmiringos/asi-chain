@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 # Run a single experiment iteration with given node configuration parameters.
-# Usage: ./scripts/experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms>
-# Example: ./scripts/experiment.sh 1 5 5000
+# Usage: ./scripts/experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms> [vus]
+# Example: ./scripts/experiment.sh 0.5 2 1000 10
 set -euo pipefail
 
-INTERVAL=${1:?Usage: experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms>}
+INTERVAL=${1:?Usage: experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms> [vus]}
 LFB_AGE=${2:?}
 COOLDOWN=${3:?}
+VUS=${4:-2}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
 NAMESPACE="asi-chain"
-TAG="hb-ci${INTERVAL}s-lfb${LFB_AGE}s-cd${COOLDOWN}ms"
+TAG="hb-ci${INTERVAL}s-lfb${LFB_AGE}s-cd${COOLDOWN}ms-vu${VUS}"
 
 echo ""
 echo "========================================"
 echo "  Experiment: ${TAG}"
-echo "  check-interval=${INTERVAL}s | max-lfb-age=${LFB_AGE}s | cooldown=${COOLDOWN}ms"
+echo "  check-interval=${INTERVAL}s | max-lfb-age=${LFB_AGE}s | cooldown=${COOLDOWN}ms | vus=${VUS}"
 echo "========================================"
 
 # 1. Generate modified validator configmaps in temp dir (source files stay intact)
@@ -78,13 +79,13 @@ PUSHGW="http://pushgateway.monitoring.svc.cluster.local:9091"
 echo "==> Pushing experiment config to Pushgateway..."
 $KUBECTL run --rm -i --restart=Never --namespace=monitoring \
   tmp-push-$$ --image=curlimages/curl:8.5.0 \
-  -- sh -c "printf 'k6_experiment_config{check_interval=\"${INTERVAL}\",max_lfb_age=\"${LFB_AGE}\",cooldown_ms=\"${COOLDOWN}\"} 1\n' \
+  -- sh -c "printf 'k6_experiment_config{check_interval=\"${INTERVAL}\",max_lfb_age=\"${LFB_AGE}\",cooldown_ms=\"${COOLDOWN}\",vus=\"${VUS}\"} 1\n' \
   | curl -sf --data-binary @- '${PUSHGW}/metrics/job/k6/testid/${TAG}'" \
   2>/dev/null || echo "WARNING: could not push config to Pushgateway"
 
 # 6. Run k6 confirmed-hello-world — TAG is embedded in testid via job name
 echo "==> Starting k6 test..."
-make -C "${ROOT_DIR}" k6-confirm-hello K6_TAG="${TAG}"
+make -C "${ROOT_DIR}" k6-confirm-hello K6_TAG="${TAG}" K6_VUS="${VUS}"
 
 # 6. Wait for the k6 job to finish
 echo "==> Waiting for k6 job to complete..."

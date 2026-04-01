@@ -256,7 +256,7 @@ LFB_AGE   ?= 5
 COOLDOWN  ?= 5000
 
 experiment:
-	@bash scripts/experiment.sh $(INTERVAL) $(LFB_AGE) $(COOLDOWN)
+	@bash scripts/heartbeat-experiment.sh $(INTERVAL) $(LFB_AGE) $(COOLDOWN)
 
 experiment-matrix:
-	@bash scripts/experiment-matrix.sh
+	@bash scripts/heartbeat-experiment-matrix.sh
