@@ -32,7 +32,7 @@ gen:
 		echo "BOOTSTRAP_NODE_ID=$$NODE_ID"; \
 		echo "NETWORK_ID=testnet"; \
 		echo ""; \
-		python3 gen_validator_keys.py 3; \
+		python3 gen_validator_keys.py 4; \
 	} > .env; \
 	echo "Bootstrap Node ID: $$NODE_ID"; \
 	echo "==> Written to .env (contains private keys — do not commit)"
@@ -51,11 +51,12 @@ start:
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
 	@$(KUBECTL) apply -f namespace.yaml
 	@$(KUBECTL) apply -f configmap-wallets.yaml
-	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-observer.yaml; do \
+	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml configmap-observer.yaml; do \
 		sed \
 			-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V2_PUBKEY/$(VALIDATOR2_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V3_PUBKEY/$(VALIDATOR3_PUBLIC_KEY)/g" \
+			-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
 			$$cm | $(KUBECTL) apply -f -; \
 	done
 	@$(KUBECTL) apply -f pvcs.yaml
@@ -86,6 +87,8 @@ start:
 		-e "s/REPLACE_V2_PRIVKEY/$(VALIDATOR2_PRIVATE_KEY)/g" \
 		-e "s/REPLACE_V3_PUBKEY/$(VALIDATOR3_PUBLIC_KEY)/g" \
 		-e "s/REPLACE_V3_PRIVKEY/$(VALIDATOR3_PRIVATE_KEY)/g" \
+		-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
+		-e "s/REPLACE_V4_PRIVKEY/$(VALIDATOR4_PRIVATE_KEY)/g" \
 		$(_AUTOPROPOSE_SED) \
 		statefulset-validators.yaml | $(KUBECTL) apply -f -
 	@sed \

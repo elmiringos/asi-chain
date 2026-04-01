@@ -78,6 +78,8 @@ export function pushReport(data, scriptName, nodeUrl) {
   const confirmP95 = m["deploy_confirmation_ms"]?.values?.["p(95)"] ?? 0;
   const payloadAvg = m["deploy_payload_bytes"]?.values?.avg ?? 0;
   const avgDeploys = blocksProduced > 0 ? confirmed / blocksProduced : 0;
+  const testDurationSec = (data.state?.testRunDurationMs ?? 0) / 1000;
+  const throughput = testDurationSec > 0 ? confirmed / testDurationSec : 0;
 
   // Build Prometheus text exposition
   const lines = [
@@ -114,6 +116,11 @@ export function pushReport(data, scriptName, nodeUrl) {
     "# HELP k6_test_payload_bytes_avg Average deploy payload size in bytes",
     "# TYPE k6_test_payload_bytes_avg gauge",
     `k6_test_payload_bytes_avg ${Math.round(payloadAvg)}`,
+
+    "",
+    "# HELP k6_test_deploy_throughput_per_sec Confirmed deploys per second (confirmed / test duration)",
+    "# TYPE k6_test_deploy_throughput_per_sec gauge",
+    `k6_test_deploy_throughput_per_sec ${throughput.toFixed(3)}`,
   ];
 
   const payload = lines.join("\n") + "\n";

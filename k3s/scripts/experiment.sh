@@ -12,12 +12,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
 NAMESPACE="asi-chain"
-TAG="ci${INTERVAL}s-lfb${LFB_AGE}s-cd${COOLDOWN}"
+TAG="hb-ci${INTERVAL}s-lfb${LFB_AGE}s-cd${COOLDOWN}ms"
 
 echo ""
 echo "========================================"
 echo "  Experiment: ${TAG}"
-echo "  check-interval=${INTERVAL}s  max-lfb-age=${LFB_AGE}s  cooldown=${COOLDOWN}ms"
+echo "  check-interval=${INTERVAL}s | max-lfb-age=${LFB_AGE}s | cooldown=${COOLDOWN}ms"
 echo "========================================"
 
 # 1. Generate modified validator configmaps in temp dir (source files stay intact)
