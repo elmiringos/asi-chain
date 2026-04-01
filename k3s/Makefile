@@ -12,7 +12,8 @@ export
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
-	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-clean k6-dashboard
+	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-clean k6-dashboard \
+	experiment experiment-matrix
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
 gen:
@@ -183,6 +184,7 @@ K6_VUS      ?= 5
 K6_DURATION ?= 30s
 K6_SCRIPT   ?= hello-world
 K6_NODE     ?= validator1
+K6_TAG      ?=
 
 k6-build:
 	@echo "==> Building k6-tests image (xk6 + Go extension inside Docker)..."
@@ -197,7 +199,11 @@ k6-run:
 	@RUN_ID=$$(date +%Y-%m-%d-%H-%M-%S); \
 	NODE_URL="http://$(K6_NODE)-0.$(K6_NODE).$(NAMESPACE).svc.cluster.local:40403"; \
 	SCRIPT_SLUG=$$(echo "$(K6_SCRIPT)" | tr '/' '-'); \
-	JOB_NAME="k6-$$SCRIPT_SLUG-$$RUN_ID"; \
+	if [ -n "$(K6_TAG)" ]; then \
+		JOB_NAME="k6-$(K6_TAG)-$$RUN_ID"; \
+	else \
+		JOB_NAME="k6-$$SCRIPT_SLUG-$$RUN_ID"; \
+	fi; \
 	sed \
 		-e "s|REPLACE_JOB_NAME|$$JOB_NAME|g" \
 		-e "s|REPLACE_SCRIPT|$(K6_SCRIPT)|g" \
@@ -237,3 +243,17 @@ k6-clean:
 k6-dashboard:
 	@echo "==> Importing k6 Grafana dashboard..."
 	@bash monitoring/import-dashboards.sh 2>&1 | grep -E "k6|Done|ERROR"
+
+# --- Experiments: sweep node config params, measure block time & CPU ---
+# Usage:
+#   make experiment INTERVAL=1 LFB_AGE=5 COOLDOWN=5000
+#   make experiment-matrix   (runs all ~10 combinations, ~40 min total)
+INTERVAL  ?= 1
+LFB_AGE   ?= 5
+COOLDOWN  ?= 5000
+
+experiment:
+	@bash scripts/experiment.sh $(INTERVAL) $(LFB_AGE) $(COOLDOWN)
+
+experiment-matrix:
+	@bash scripts/experiment-matrix.sh

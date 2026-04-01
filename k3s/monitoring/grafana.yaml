@@ -297,6 +297,33 @@ data:
               "legendFormat": "{{ pod }}"
             }
           ]
+        },
+        {
+          "id": 12, "gridPos": { "h": 3, "w": 24, "x": 0, "y": 32 },
+          "type": "table", "title": "Experiment Config",
+          "datasource": { "uid": "prometheus" },
+          "options": {
+            "footer": { "show": false },
+            "showHeader": true,
+            "cellHeight": "sm"
+          },
+          "fieldConfig": {
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Time" }, "properties": [{ "id": "custom.hidden", "value": true }] },
+              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "custom.hidden", "value": true }] },
+              { "matcher": { "id": "byName", "options": "__name__" }, "properties": [{ "id": "custom.hidden", "value": true }] },
+              { "matcher": { "id": "byName", "options": "job" }, "properties": [{ "id": "custom.hidden", "value": true }] },
+              { "matcher": { "id": "byName", "options": "testid" }, "properties": [{ "id": "custom.hidden", "value": true }] }
+            ]
+          },
+          "targets": [
+            {
+              "expr": "k6_experiment_config{testid=\"$testid\"}",
+              "instant": true,
+              "legendFormat": "",
+              "format": "table"
+            }
+          ]
         }
       ]
     }
