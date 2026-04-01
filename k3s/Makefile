@@ -1,8 +1,10 @@
 KUBECTL    = kubectl
 NAMESPACE  = asi-chain
 AUTOPROPOSE ?= 1
+HEARTBEAT   ?= 1
 
 _AUTOPROPOSE_SED = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
+_HEARTBEAT_SED   = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
 
 -include .env
 export
@@ -57,6 +59,7 @@ start:
 			-e "s/REPLACE_V2_PUBKEY/$(VALIDATOR2_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V3_PUBKEY/$(VALIDATOR3_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
+			$(_HEARTBEAT_SED) \
 			$$cm | $(KUBECTL) apply -f -; \
 	done
 	@$(KUBECTL) apply -f pvcs.yaml
@@ -254,9 +257,10 @@ k6-dashboard:
 INTERVAL  ?= 1
 LFB_AGE   ?= 5
 COOLDOWN  ?= 5000
+SCENARIO  ?= confirm-hello
 
 experiment:
-	@bash scripts/heartbeat-experiment.sh $(INTERVAL) $(LFB_AGE) $(COOLDOWN)
+	@bash scripts/heartbeat-experiment.sh $(INTERVAL) $(LFB_AGE) $(COOLDOWN) $(K6_VUS) $(SCENARIO)
 
 experiment-matrix:
 	@bash scripts/heartbeat-experiment-matrix.sh

@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# Run a single experiment iteration with given node configuration parameters.
-# Usage: ./scripts/experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms> [vus]
-# Example: ./scripts/experiment.sh 0.5 2 1000 10
+# Run a single heartbeat experiment iteration with given node configuration parameters.
+# Usage: ./scripts/heartbeat-experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms> [vus] [scenario]
+# Scenarios: confirm-hello (default), mixed
+# Example: ./scripts/heartbeat-experiment.sh 0.5 2 1000 10 mixed
 set -euo pipefail
 
-INTERVAL=${1:?Usage: experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms> [vus]}
+INTERVAL=${1:?Usage: heartbeat-experiment.sh <check-interval-s> <max-lfb-age-s> <cooldown-ms> [vus] [scenario]}
 LFB_AGE=${2:?}
 COOLDOWN=${3:?}
 VUS=${4:-2}
+SCENARIO=${5:-confirm-hello}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
 NAMESPACE="asi-chain"
-TAG="hb-ci${INTERVAL}s-lfb${LFB_AGE}s-cd${COOLDOWN}ms-vu${VUS}"
+TAG="hb-${SCENARIO}-ci${INTERVAL}s-lfb${LFB_AGE}s-cd${COOLDOWN}ms-vu${VUS}"
 
 echo ""
 echo "========================================"
@@ -85,7 +87,11 @@ $KUBECTL run --rm -i --restart=Never --namespace=monitoring \
 
 # 6. Run k6 confirmed-hello-world — TAG is embedded in testid via job name
 echo "==> Starting k6 test..."
-make -C "${ROOT_DIR}" k6-confirm-hello K6_TAG="${TAG}" K6_VUS="${VUS}"
+case "${SCENARIO}" in
+  mixed)         make -C "${ROOT_DIR}" k6-mixed         K6_TAG="${TAG}" K6_VUS="${VUS}" ;;
+  confirm-hello) make -C "${ROOT_DIR}" k6-confirm-hello K6_TAG="${TAG}" K6_VUS="${VUS}" ;;
+  *)             echo "ERROR: unknown scenario '${SCENARIO}'. Use: confirm-hello, mixed"; exit 1 ;;
+esac
 
 # 6. Wait for the k6 job to finish
 echo "==> Waiting for k6 job to complete..."
