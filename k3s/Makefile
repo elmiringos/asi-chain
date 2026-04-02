@@ -14,7 +14,7 @@ export
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
-	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-clean k6-dashboard \
+	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-burst k6-clean k6-dashboard \
 	experiment experiment-matrix
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
@@ -186,11 +186,12 @@ logs-api:
 #        make k6-confirm-transfer     (confirmed, block metrics)
 #        make k6-mixed                (confirmed HelloWorld + Transfer)
 #        make k6-run K6_SCRIPT=... [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
-K6_VUS      ?= 5
-K6_DURATION ?= 30s
-K6_SCRIPT   ?= hello-world
-K6_NODE     ?= validator1
-K6_TAG      ?=
+K6_VUS          ?= 5
+K6_DURATION     ?= 30s
+K6_SCRIPT       ?= hello-world
+K6_NODE         ?= validator1
+K6_TAG          ?=
+K6_PRIVATE_KEYS ?= $(VALIDATOR1_PRIVATE_KEY)
 
 k6-build:
 	@echo "==> Building k6-tests image (xk6 + Go extension inside Docker)..."
@@ -216,6 +217,7 @@ k6-run:
 		-e "s|REPLACE_RUN_ID|$$RUN_ID|g" \
 		-e "s|REPLACE_NODE_URL|$$NODE_URL|g" \
 		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
+		-e "s|REPLACE_PRIVATE_KEYS|$(K6_PRIVATE_KEYS)|g" \
 		-e "s|REPLACE_FROM_ADDR|$(VALIDATOR1_PUBLIC_KEY)|g" \
 		-e "s|REPLACE_TO_ADDR|$(VALIDATOR2_PUBLIC_KEY)|g" \
 		-e "s|REPLACE_VUS|$(K6_VUS)|g" \
@@ -242,6 +244,10 @@ k6-confirm-transfer:
 
 k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
+
+k6-burst:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/burst-block K6_VUS=32 K6_DURATION=60s \
+		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 
 k6-clean:
 	@$(KUBECTL) delete jobs -n monitoring -l app=k6 --ignore-not-found

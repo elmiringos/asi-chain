@@ -61,10 +61,14 @@ export function pushReport(data, scriptName, nodeUrl) {
   const fetchCount = Math.min(currentBlock - startBlock + 20, 500);
   const blocks = fetchCount > 0 ? fetchBlocks(nodeUrl, startBlock, endBlock, fetchCount) : [];
 
+  const testEndMs = blocks.length > 0 ? blocks[blocks.length - 1].timestamp : 0;
+  const testStartMs = testEndMs - testDurationSec * 1000;
+  const testBlocks = blocks.filter(b => b.timestamp >= testStartMs);
+
   const creationTimes = [];
-  for (let i = 1; i < blocks.length; i++) {
-    const dt = blocks[i].timestamp - blocks[i - 1].timestamp;
-    const db = blocks[i].blockNumber - blocks[i - 1].blockNumber;
+  for (let i = 1; i < testBlocks.length; i++) {
+    const dt = testBlocks[i].timestamp - testBlocks[i - 1].timestamp;
+    const db = testBlocks[i].blockNumber - testBlocks[i - 1].blockNumber;
     if (dt > 0 && db > 0) creationTimes.push(dt / db);
   }
   const avgCreationTime =

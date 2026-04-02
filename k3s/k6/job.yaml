@@ -29,6 +29,8 @@ spec:
             - --env
             - PRIVATE_KEY=REPLACE_PRIVATE_KEY
             - --env
+            - PRIVATE_KEYS=REPLACE_PRIVATE_KEYS
+            - --env
             - FROM_ADDR=REPLACE_FROM_ADDR
             - --env
             - TO_ADDR=REPLACE_TO_ADDR
