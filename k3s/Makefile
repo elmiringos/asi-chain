@@ -10,12 +10,67 @@ _HEARTBEAT_SED   = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = 
 export
 
 
-.PHONY: gen start stop restart status bootstrap-id \
+.PHONY: help gen start stop restart status bootstrap-id \
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
 	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-burst k6-clean k6-dashboard \
 	experiment experiment-matrix
+
+help:
+	@echo ""
+	@echo "Usage: make <target> [OPTIONS]"
+	@echo ""
+	@echo "Chain"
+	@echo "  gen                        Generate bootstrap TLS key + validator keypairs → .env"
+	@echo "  start                      Deploy and start the chain (requires .env)"
+	@echo "    HEARTBEAT=0              Start with heartbeat disabled"
+	@echo "    AUTOPROPOSE=0            Start with autopropose disabled"
+	@echo "  stop                       Delete chain namespace (wipes all data)"
+	@echo "  restart                    stop + start"
+	@echo "  status                     Show pod status"
+	@echo "  bootstrap-id               Print bootstrap node ID"
+	@echo "  logs-bootstrap             Stream bootstrap logs"
+	@echo "  logs-validator1/2/3        Stream validator logs"
+	@echo "  logs-observer              Stream observer logs"
+	@echo ""
+	@echo "Monitoring"
+	@echo "  monitoring-start           Deploy Prometheus, Grafana, Pushgateway"
+	@echo "  monitoring-stop            Delete monitoring namespace"
+	@echo ""
+	@echo "Management API"
+	@echo "  api-build                  Build management-api Docker image"
+	@echo "  api-start                  Deploy management-api"
+	@echo "  api-stop                   Remove management-api"
+	@echo "  logs-api                   Stream management-api logs"
+	@echo ""
+	@echo "k6 Load Tests"
+	@echo "  k6-build                   Build k6-tests Docker image"
+	@echo "  k6-hello-world             Unconfirmed HelloWorld deploys  (VUS=5, 60s)"
+	@echo "  k6-transfer                Unconfirmed Transfer deploys    (VUS=5, 60s)"
+	@echo "  k6-confirm-hello           Confirmed HelloWorld deploys    (VUS=2, 120s)"
+	@echo "  k6-confirm-transfer        Confirmed Transfer deploys      (VUS=2, 120s)"
+	@echo "  k6-mixed                   Confirmed mixed workload        (VUS=4, 120s)"
+	@echo "  k6-burst                   Max deploys per block burst     (VUS=32, 60s)"
+	@echo "  k6-run                     Custom run — see options below"
+	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
+	@echo "    K6_NODE=<validator>      Target node (default: validator1)"
+	@echo "    K6_VUS=<n>               Virtual users (default: 5)"
+	@echo "    K6_DURATION=<t>          Duration e.g. 60s, 5m (default: 30s)"
+	@echo "    K6_TAG=<tag>             Override testid prefix in Grafana"
+	@echo "  k6-logs                    Stream logs from last k6 job"
+	@echo "  k6-clean                   Delete completed k6 jobs"
+	@echo "  k6-dashboard               Import k6 dashboard into Grafana"
+	@echo ""
+	@echo "Experiments"
+	@echo "  experiment                 Single heartbeat experiment run"
+	@echo "    INTERVAL=<s>             check-interval in seconds (default: 1)"
+	@echo "    LFB_AGE=<s>              max-lfb-age in seconds   (default: 5)"
+	@echo "    COOLDOWN=<ms>            self-propose cooldown ms  (default: 5000)"
+	@echo "    K6_VUS=<n>               Virtual users             (default: 2)"
+	@echo "    SCENARIO=<name>          confirm-hello | mixed     (default: confirm-hello)"
+	@echo "  experiment-matrix          Full heartbeat sweep matrix (~40 min)"
+	@echo ""
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
 gen:
@@ -216,8 +271,8 @@ k6-run:
 		-e "s|REPLACE_SCRIPT|$(K6_SCRIPT)|g" \
 		-e "s|REPLACE_RUN_ID|$$RUN_ID|g" \
 		-e "s|REPLACE_NODE_URL|$$NODE_URL|g" \
-		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
 		-e "s|REPLACE_PRIVATE_KEYS|$(K6_PRIVATE_KEYS)|g" \
+		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
 		-e "s|REPLACE_FROM_ADDR|$(VALIDATOR1_PUBLIC_KEY)|g" \
 		-e "s|REPLACE_TO_ADDR|$(VALIDATOR2_PUBLIC_KEY)|g" \
 		-e "s|REPLACE_VUS|$(K6_VUS)|g" \
