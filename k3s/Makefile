@@ -5,11 +5,13 @@ HEARTBEAT                ?= 1
 MAX_DEPLOYS_PER_BLOCK    ?= 32
 GRPC_STREAM_MSG_SIZE     ?= 256M
 BURST_MAX_VUS            ?= 256
+CASPER_LOOP_INTERVAL     ?= 1
 
 _AUTOPROPOSE_SED     = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
 _HEARTBEAT_SED       = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
 _MAX_DEPLOYS_SED     = -e '/F1R3_MAX_USER_DEPLOYS_PER_BLOCK/{n;s/value: ".*"/value: "$(MAX_DEPLOYS_PER_BLOCK)"/}'
 _GRPC_STREAM_SED     = -e 's/grpc-max-recv-stream-message-size = .*/grpc-max-recv-stream-message-size = $(GRPC_STREAM_MSG_SIZE)/'
+_CASPER_LOOP_SED     = -e 's/casper-loop-interval = [0-9.]* seconds/casper-loop-interval = $(CASPER_LOOP_INTERVAL) seconds/'
 
 -include .env
 export
@@ -33,6 +35,7 @@ help:
 	@echo "    AUTOPROPOSE=0            Start with autopropose disabled"
 	@echo "    MAX_DEPLOYS_PER_BLOCK=N  Max deploys per user per block (default: 32)"
 	@echo "    GRPC_STREAM_MSG_SIZE=S   gRPC max stream message size e.g. 512M (default: 256M)"
+	@echo "    CASPER_LOOP_INTERVAL=N   Block creation interval in seconds (default: 1)"
 	@echo "  stop                       Delete chain namespace (wipes all data)"
 	@echo "  restart                    stop + start"
 	@echo "  status                     Show pod status"
@@ -118,7 +121,7 @@ start:
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
 	@$(KUBECTL) apply -f namespace.yaml
 	@$(KUBECTL) apply -f configmap-wallets.yaml
-	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml configmap-observer.yaml; do \
+	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml; do \
 		sed \
 			-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V2_PUBKEY/$(VALIDATOR2_PUBLIC_KEY)/g" \
@@ -126,8 +129,17 @@ start:
 			-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
 			$(_HEARTBEAT_SED) \
 			$(_GRPC_STREAM_SED) \
+			$(_CASPER_LOOP_SED) \
 			$$cm | $(KUBECTL) apply -f -; \
 	done
+	@sed \
+		-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
+		-e "s/REPLACE_V2_PUBKEY/$(VALIDATOR2_PUBLIC_KEY)/g" \
+		-e "s/REPLACE_V3_PUBKEY/$(VALIDATOR3_PUBLIC_KEY)/g" \
+		-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
+		$(_HEARTBEAT_SED) \
+		$(_GRPC_STREAM_SED) \
+		configmap-observer.yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) apply -f pvcs.yaml
 	@$(KUBECTL) apply -f services.yaml
 
@@ -299,7 +311,7 @@ k6-run:
 	echo "    Logs: make k6-logs"
 
 k6-logs:
-	@$(KUBECTL) logs -n monitoring -l app=k6 --tail=200 -f
+	@$(KUBECTL) logs -n monitoring -l app=k6 --tail=200 -f --max-log-requests=20
 
 k6-hello-world:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=hello-world K6_VUS=5 K6_DURATION=60s
