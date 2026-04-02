@@ -138,7 +138,7 @@ spec:
               containerPort: 40405
           resources:
             limits:
-              cpu: "1"
+              cpu: "2500m"
               memory: 2Gi
           volumeMounts:
             - name: data
