@@ -6,12 +6,14 @@ MAX_DEPLOYS_PER_BLOCK    ?= 32
 GRPC_STREAM_MSG_SIZE     ?= 256M
 BURST_MAX_VUS            ?= 256
 CASPER_LOOP_INTERVAL     ?= 1
+SYNCHRONY_THRESHOLD      ?= 0.33
 
-_AUTOPROPOSE_SED     = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
-_HEARTBEAT_SED       = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
-_MAX_DEPLOYS_SED     = -e '/F1R3_MAX_USER_DEPLOYS_PER_BLOCK/{n;s/value: ".*"/value: "$(MAX_DEPLOYS_PER_BLOCK)"/}'
-_GRPC_STREAM_SED     = -e 's/grpc-max-recv-stream-message-size = .*/grpc-max-recv-stream-message-size = $(GRPC_STREAM_MSG_SIZE)/'
-_CASPER_LOOP_SED     = -e 's/casper-loop-interval = [0-9.]* seconds/casper-loop-interval = $(CASPER_LOOP_INTERVAL) seconds/'
+_AUTOPROPOSE_SED        = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
+_HEARTBEAT_SED          = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
+_MAX_DEPLOYS_SED        = -e '/F1R3_MAX_USER_DEPLOYS_PER_BLOCK/{n;s/value: ".*"/value: "$(MAX_DEPLOYS_PER_BLOCK)"/}'
+_GRPC_STREAM_SED        = -e 's/grpc-max-recv-stream-message-size = .*/grpc-max-recv-stream-message-size = $(GRPC_STREAM_MSG_SIZE)/'
+_CASPER_LOOP_SED        = -e 's/casper-loop-interval = [0-9.]* seconds/casper-loop-interval = $(CASPER_LOOP_INTERVAL) seconds/'
+_SYNCHRONY_SED          = -e '/F1R3_SYNCHRONY_CONSTRAINT_THRESHOLD/{n;s/value: ".*"/value: "$(SYNCHRONY_THRESHOLD)"/}'
 
 -include .env
 export
@@ -36,6 +38,7 @@ help:
 	@echo "    MAX_DEPLOYS_PER_BLOCK=N  Max deploys per user per block (default: 32)"
 	@echo "    GRPC_STREAM_MSG_SIZE=S   gRPC max stream message size e.g. 512M (default: 256M)"
 	@echo "    CASPER_LOOP_INTERVAL=N   Block creation interval in seconds (default: 1)"
+	@echo "    SYNCHRONY_THRESHOLD=F    Synchrony constraint 0.0–1.0 (default: 0.33, use 0 with HEARTBEAT=0)"
 	@echo "  stop                       Delete chain namespace (wipes all data)"
 	@echo "  restart                    stop + start"
 	@echo "  status                     Show pod status"
@@ -156,6 +159,7 @@ start:
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
 		$(_AUTOPROPOSE_SED) \
 		$(_MAX_DEPLOYS_SED) \
+		$(_SYNCHRONY_SED) \
 		statefulset-bootstrap.yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) rollout status statefulset/bootstrap -n $(NAMESPACE) --timeout=120s
 
@@ -173,6 +177,7 @@ start:
 		-e "s/REPLACE_V4_PRIVKEY/$(VALIDATOR4_PRIVATE_KEY)/g" \
 		$(_AUTOPROPOSE_SED) \
 		$(_MAX_DEPLOYS_SED) \
+		$(_SYNCHRONY_SED) \
 		statefulset-validators.yaml | $(KUBECTL) apply -f -
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
