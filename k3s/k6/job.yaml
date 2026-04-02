@@ -31,6 +31,8 @@ spec:
             - --env
             - PRIVATE_KEYS=REPLACE_PRIVATE_KEYS
             - --env
+            - TOTAL_DEPLOYS=REPLACE_TOTAL_DEPLOYS
+            - --env
             - FROM_ADDR=REPLACE_FROM_ADDR
             - --env
             - TO_ADDR=REPLACE_TO_ADDR
@@ -47,8 +49,8 @@ spec:
             - /scripts/REPLACE_SCRIPT.js
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
               cpu: 500m
-              memory: 256Mi
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi

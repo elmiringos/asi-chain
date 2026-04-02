@@ -4,6 +4,7 @@ AUTOPROPOSE              ?= 1
 HEARTBEAT                ?= 1
 MAX_DEPLOYS_PER_BLOCK    ?= 32
 GRPC_STREAM_MSG_SIZE     ?= 256M
+BURST_MAX_VUS            ?= 256
 
 _AUTOPROPOSE_SED     = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
 _HEARTBEAT_SED       = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
@@ -57,11 +58,14 @@ help:
 	@echo "  k6-confirm-hello           Confirmed HelloWorld deploys    (VUS=2, 120s)"
 	@echo "  k6-confirm-transfer        Confirmed Transfer deploys      (VUS=2, 120s)"
 	@echo "  k6-mixed                   Confirmed mixed workload        (VUS=4, 120s)"
-	@echo "  k6-burst                   Max deploys per block burst     (VUS=32, 60s)"
+	@echo "  k6-burst                   Max deploys per block burst     (VUS≤256, 60s)"
+	@echo "    MAX_DEPLOYS_PER_BLOCK=N  Controls total deploys/burst (deploys = N × 4 keys)"
+	@echo "    BURST_MAX_VUS=N          Cap on VU count to prevent OOM (default: 256)"
 	@echo "  k6-run                     Custom run — see options below"
 	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
 	@echo "    K6_NODE=<validator>      Target node (default: validator1)"
 	@echo "    K6_VUS=<n>               Virtual users (default: 5)"
+	@echo "    K6_TOTAL_DEPLOYS=<n>     Total deploys per burst (burst-block only, default: K6_VUS)"
 	@echo "    K6_DURATION=<t>          Duration e.g. 60s, 5m (default: 30s)"
 	@echo "    K6_TAG=<tag>             Override testid prefix in Grafana"
 	@echo "  k6-logs                    Stream logs from last k6 job"
@@ -251,12 +255,13 @@ logs-api:
 #        make k6-confirm-transfer     (confirmed, block metrics)
 #        make k6-mixed                (confirmed HelloWorld + Transfer)
 #        make k6-run K6_SCRIPT=... [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
-K6_VUS          ?= 5
-K6_DURATION     ?= 30s
-K6_SCRIPT       ?= hello-world
-K6_NODE         ?= validator1
-K6_TAG          ?=
-K6_PRIVATE_KEYS ?= $(VALIDATOR1_PRIVATE_KEY)
+K6_VUS           ?= 5
+K6_DURATION      ?= 30s
+K6_SCRIPT        ?= hello-world
+K6_NODE          ?= validator1
+K6_TAG           ?=
+K6_PRIVATE_KEYS  ?= $(VALIDATOR1_PRIVATE_KEY)
+K6_TOTAL_DEPLOYS ?= $(K6_VUS)
 
 k6-build:
 	@echo "==> Building k6-tests image (xk6 + Go extension inside Docker)..."
@@ -282,6 +287,7 @@ k6-run:
 		-e "s|REPLACE_RUN_ID|$$RUN_ID|g" \
 		-e "s|REPLACE_NODE_URL|$$NODE_URL|g" \
 		-e "s|REPLACE_PRIVATE_KEYS|$(K6_PRIVATE_KEYS)|g" \
+		-e "s|REPLACE_TOTAL_DEPLOYS|$(K6_TOTAL_DEPLOYS)|g" \
 		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
 		-e "s|REPLACE_FROM_ADDR|$(VALIDATOR1_PUBLIC_KEY)|g" \
 		-e "s|REPLACE_TO_ADDR|$(VALIDATOR2_PUBLIC_KEY)|g" \
@@ -311,8 +317,11 @@ k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
 
 k6-burst:
+	$(eval _BURST_TOTAL := $(shell expr $(MAX_DEPLOYS_PER_BLOCK) \* 4))
+	$(eval _BURST_VUS   := $(shell [ $(_BURST_TOTAL) -gt $(BURST_MAX_VUS) ] && echo $(BURST_MAX_VUS) || echo $(_BURST_TOTAL)))
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/burst-block \
-		K6_VUS=$(shell expr $(MAX_DEPLOYS_PER_BLOCK) \* 4) \
+		K6_VUS=$(_BURST_VUS) \
+		K6_TOTAL_DEPLOYS=$(_BURST_TOTAL) \
 		K6_DURATION=60s \
 		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 

@@ -37,6 +37,9 @@ const SHARD_ID = __ENV.SHARD_ID || "root";
 const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT ? parseInt(__ENV.CONFIRM_TIMEOUT) : 30;
 const VUS = __ENV.VUS ? parseInt(__ENV.VUS) : 32;
 const BURSTS = __ENV.BURSTS ? parseInt(__ENV.BURSTS) : 3;
+// TOTAL_DEPLOYS: total deploys per burst (= MAX_DEPLOYS_PER_BLOCK × num_keys).
+// Decoupled from VUS so we can cap VUs without reducing deploy count.
+const TOTAL_DEPLOYS = __ENV.TOTAL_DEPLOYS ? parseInt(__ENV.TOTAL_DEPLOYS) : VUS;
 
 // Support multiple private keys (comma-separated) to bypass per-user deploy limit.
 // Each VU picks a key by its index: VU 1 → key[0], VU 2 → key[1], etc.
@@ -52,14 +55,14 @@ const unconfirmedCounter = new Counter("deploy_unconfirmed");
 const blockNumberGauge = new Gauge("blockchain_block_number");
 const deployPayloadBytes = new Trend("deploy_payload_bytes", true);
 
-// shared-iterations: all VUS * BURSTS iterations distributed across VUs,
-// all VUs start simultaneously → maximum burst density
+// shared-iterations: all VUs start simultaneously → maximum burst density.
+// iterations = TOTAL_DEPLOYS * BURSTS so deploy count is independent of VU count.
 export const options = {
   scenarios: {
     burst: {
       executor: "shared-iterations",
       vus: VUS,
-      iterations: VUS * BURSTS,
+      iterations: TOTAL_DEPLOYS * BURSTS,
       maxDuration: "120s",
     },
   },
