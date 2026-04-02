@@ -100,6 +100,7 @@ data:
               - observer-0.observer.asi-chain.svc.cluster.local:40403
 
       - job_name: firefly-exporter
+        honor_labels: true
         static_configs:
           - targets:
               - firefly-exporter.monitoring.svc.cluster.local:9101
