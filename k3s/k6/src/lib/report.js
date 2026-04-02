@@ -77,6 +77,9 @@ export function pushReport(data, scriptName, nodeUrl) {
       ? creationTimes.reduce((s, v) => s + v, 0) / creationTimes.length
       : 0;
 
+  // Max deploys in a single block (from node API deployCount field)
+  const maxDeploys = testBlocks.reduce((max, b) => Math.max(max, b.deployCount || 0), 0);
+
   // k6 summary metrics
   const confirmed = m["deploy_confirmed"]?.values?.count ?? 0;
   const unconfirmed = m["deploy_unconfirmed"]?.values?.count ?? 0;
@@ -125,6 +128,11 @@ export function pushReport(data, scriptName, nodeUrl) {
     "# HELP k6_test_deploy_throughput_per_sec Confirmed deploys per second (confirmed / test duration)",
     "# TYPE k6_test_deploy_throughput_per_sec gauge",
     `k6_test_deploy_throughput_per_sec ${throughput.toFixed(3)}`,
+
+    "",
+    "# HELP k6_test_max_deploys_in_block Maximum deploys observed in a single block",
+    "# TYPE k6_test_max_deploys_in_block gauge",
+    `k6_test_max_deploys_in_block ${maxDeploys}`,
   ];
 
   const payload = lines.join("\n") + "\n";
@@ -135,7 +143,7 @@ export function pushReport(data, scriptName, nodeUrl) {
     console.warn(`pushReport: Pushgateway returned ${pushRes.status} — ${pushRes.body}`);
   } else {
     console.log(
-      `pushReport: report pushed — blocks=${blocksProduced}, confirmed=${confirmed}, unconfirmed=${unconfirmed}, avg=${avgDeploys.toFixed(1)}`,
+      `pushReport: report pushed — blocks=${blocksProduced}, confirmed=${confirmed}, unconfirmed=${unconfirmed}, avg=${avgDeploys.toFixed(1)}, max_in_block=${maxDeploys}`,
     );
   }
 }
