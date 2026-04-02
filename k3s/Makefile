@@ -1,10 +1,14 @@
 KUBECTL    = kubectl
 NAMESPACE  = asi-chain
-AUTOPROPOSE ?= 1
-HEARTBEAT   ?= 1
+AUTOPROPOSE              ?= 1
+HEARTBEAT                ?= 1
+MAX_DEPLOYS_PER_BLOCK    ?= 32
+GRPC_STREAM_MSG_SIZE     ?= 256M
 
-_AUTOPROPOSE_SED = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
-_HEARTBEAT_SED   = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
+_AUTOPROPOSE_SED     = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
+_HEARTBEAT_SED       = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
+_MAX_DEPLOYS_SED     = -e '/F1R3_MAX_USER_DEPLOYS_PER_BLOCK/{n;s/value: ".*"/value: "$(MAX_DEPLOYS_PER_BLOCK)"/}'
+_GRPC_STREAM_SED     = -e 's/grpc-max-recv-stream-message-size = .*/grpc-max-recv-stream-message-size = $(GRPC_STREAM_MSG_SIZE)/'
 
 -include .env
 export
@@ -26,6 +30,8 @@ help:
 	@echo "  start                      Deploy and start the chain (requires .env)"
 	@echo "    HEARTBEAT=0              Start with heartbeat disabled"
 	@echo "    AUTOPROPOSE=0            Start with autopropose disabled"
+	@echo "    MAX_DEPLOYS_PER_BLOCK=N  Max deploys per user per block (default: 32)"
+	@echo "    GRPC_STREAM_MSG_SIZE=S   gRPC max stream message size e.g. 512M (default: 256M)"
 	@echo "  stop                       Delete chain namespace (wipes all data)"
 	@echo "  restart                    stop + start"
 	@echo "  status                     Show pod status"
@@ -115,6 +121,7 @@ start:
 			-e "s/REPLACE_V3_PUBKEY/$(VALIDATOR3_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
 			$(_HEARTBEAT_SED) \
+			$(_GRPC_STREAM_SED) \
 			$$cm | $(KUBECTL) apply -f -; \
 	done
 	@$(KUBECTL) apply -f pvcs.yaml
@@ -132,6 +139,7 @@ start:
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
 		$(_AUTOPROPOSE_SED) \
+		$(_MAX_DEPLOYS_SED) \
 		statefulset-bootstrap.yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) rollout status statefulset/bootstrap -n $(NAMESPACE) --timeout=120s
 
@@ -148,9 +156,11 @@ start:
 		-e "s/REPLACE_V4_PUBKEY/$(VALIDATOR4_PUBLIC_KEY)/g" \
 		-e "s/REPLACE_V4_PRIVKEY/$(VALIDATOR4_PRIVATE_KEY)/g" \
 		$(_AUTOPROPOSE_SED) \
+		$(_MAX_DEPLOYS_SED) \
 		statefulset-validators.yaml | $(KUBECTL) apply -f -
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
+		$(_MAX_DEPLOYS_SED) \
 		statefulset-observer.yaml | $(KUBECTL) apply -f -
 
 	@echo ""
@@ -301,7 +311,9 @@ k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
 
 k6-burst:
-	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/burst-block K6_VUS=128 K6_DURATION=60s \
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/burst-block \
+		K6_VUS=$(shell expr $(MAX_DEPLOYS_PER_BLOCK) \* 4) \
+		K6_DURATION=60s \
 		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 
 k6-clean:
