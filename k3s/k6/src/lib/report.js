@@ -61,6 +61,7 @@ export function pushReport(data, scriptName, nodeUrl) {
   const fetchCount = Math.min(currentBlock - startBlock + 20, 500);
   const blocks = fetchCount > 0 ? fetchBlocks(nodeUrl, startBlock, endBlock, fetchCount) : [];
 
+  const testDurationSec = (data.state?.testRunDurationMs ?? 0) / 1000;
   const testEndMs = blocks.length > 0 ? blocks[blocks.length - 1].timestamp : 0;
   const testStartMs = testEndMs - testDurationSec * 1000;
   const testBlocks = blocks.filter(b => b.timestamp >= testStartMs);
@@ -82,7 +83,6 @@ export function pushReport(data, scriptName, nodeUrl) {
   const confirmP95 = m["deploy_confirmation_ms"]?.values?.["p(95)"] ?? 0;
   const payloadAvg = m["deploy_payload_bytes"]?.values?.avg ?? 0;
   const avgDeploys = blocksProduced > 0 ? confirmed / blocksProduced : 0;
-  const testDurationSec = (data.state?.testRunDurationMs ?? 0) / 1000;
   const throughput = testDurationSec > 0 ? confirmed / testDurationSec : 0;
 
   // Build Prometheus text exposition

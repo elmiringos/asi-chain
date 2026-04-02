@@ -301,7 +301,7 @@ k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
 
 k6-burst:
-	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/burst-block K6_VUS=32 K6_DURATION=60s \
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/burst-block K6_VUS=128 K6_DURATION=60s \
 		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 
 k6-clean:
