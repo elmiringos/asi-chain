@@ -347,6 +347,12 @@ k6-confirm-transfer:
 k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
 
+k6-capacity-mixed:
+	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/capacity-mixed \
+		K6_VUS=1 \
+		K6_TOTAL_DEPLOYS=$(or $(K6_TOTAL_DEPLOYS),1000) \
+		K6_DURATION=5m
+
 k6-burst:
 	$(eval _BURST_TOTAL := $(shell expr $(MAX_DEPLOYS_PER_BLOCK) \* 4))
 	$(eval _BURST_VUS   := $(shell [ $(_BURST_TOTAL) -gt $(BURST_MAX_VUS) ] && echo $(BURST_MAX_VUS) || echo $(_BURST_TOTAL)))
