@@ -132,7 +132,12 @@ start:
 
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
 	@$(KUBECTL) apply -f namespace.yaml
-	@$(KUBECTL) apply -f configmap-wallets.yaml
+	@sed \
+		-e "s/REPLACE_V1_WALLET_ADDR/$(VALIDATOR1_WALLET_ADDR)/g" \
+		-e "s/REPLACE_V2_WALLET_ADDR/$(VALIDATOR2_WALLET_ADDR)/g" \
+		-e "s/REPLACE_V3_WALLET_ADDR/$(VALIDATOR3_WALLET_ADDR)/g" \
+		-e "s/REPLACE_V4_WALLET_ADDR/$(VALIDATOR4_WALLET_ADDR)/g" \
+		configmap-wallets.yaml | $(KUBECTL) apply -f -
 	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml; do \
 		sed \
 			-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
