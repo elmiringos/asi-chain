@@ -130,6 +130,8 @@ spec:
               value: "recency_stake"
             - name: F1R3_MAX_USER_DEPLOYS_PER_BLOCK
               value: "32"
+            - name: F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED
+              value: "true"
           ports:
             - name: p2p
               containerPort: 40400
@@ -308,6 +310,8 @@ spec:
               value: "recency_stake"
             - name: F1R3_MAX_USER_DEPLOYS_PER_BLOCK
               value: "32"
+            - name: F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED
+              value: "true"
           ports:
             - name: p2p
               containerPort: 40400
@@ -486,6 +490,8 @@ spec:
               value: "recency_stake"
             - name: F1R3_MAX_USER_DEPLOYS_PER_BLOCK
               value: "32"
+            - name: F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED
+              value: "true"
           ports:
             - name: p2p
               containerPort: 40400
@@ -635,6 +641,8 @@ spec:
               value: "recency_stake"
             - name: F1R3_MAX_USER_DEPLOYS_PER_BLOCK
               value: "32"
+            - name: F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED
+              value: "true"
           ports:
             - name: p2p
               containerPort: 40400

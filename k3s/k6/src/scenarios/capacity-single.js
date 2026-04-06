@@ -18,12 +18,15 @@
  *     6. Track the maximum deployCount across all rounds.
  *
  * Recommended chain config (run before this scenario):
- *   make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000
+ *   make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000 ADAPTIVE_DEPLOY_CAP=false
  *     — AUTOPROPOSE=0: disables casper-loop auto-propose so only our explicit POST /api/propose
  *       creates blocks; without this the loop races our propose and returns NoNewDeploys
  *     — HEARTBEAT=0: no empty heartbeat blocks between rounds
  *     — SYNCHRONY_THRESHOLD=0: validator can propose without waiting for peers
  *     — MAX_DEPLOYS_PER_BLOCK=10000: raises per-user cap so the real limit is the block size
+ *     — ADAPTIVE_DEPLOY_CAP=false: disables the EMA-based adaptive cap (default: true) which
+ *       automatically reduces deploys/block to maintain a 1-second latency target; without this
+ *       the cap ratchets down to its backlog floor max (default 8) during test floods
  *
  * Env vars:
  *   NODE_URL          — target validator (default: validator1, port 40403)

@@ -10,6 +10,7 @@ BURST_MAX_VUS            ?= 256
 CASPER_LOOP_INTERVAL     ?= 1
 SYNCHRONY_THRESHOLD      ?= 0.33
 FAULT_TOLERANCE          ?= 0.0
+ADAPTIVE_DEPLOY_CAP      ?= true
 
 _AUTOPROPOSE_SED        = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
 _HEARTBEAT_SED          = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
@@ -20,6 +21,7 @@ _BLOCK_PROTO_SED        = -e '/F1R3_BLOCK_PROTO_DECODE_BUFFER_BYTES/{n;s/value: 
 _CASPER_LOOP_SED        = -e 's/casper-loop-interval = [0-9.]* seconds/casper-loop-interval = $(CASPER_LOOP_INTERVAL) seconds/'
 _FAULT_TOLERANCE_SED    = -e 's/fault-tolerance-threshold = [0-9.]*/fault-tolerance-threshold = $(FAULT_TOLERANCE)/'
 _SYNCHRONY_SED          = -e '/F1R3_SYNCHRONY_CONSTRAINT_THRESHOLD/{n;s/value: ".*"/value: "$(SYNCHRONY_THRESHOLD)"/}'
+_ADAPTIVE_CAP_SED       = -e '/F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED/{n;s/value: ".*"/value: "$(ADAPTIVE_DEPLOY_CAP)"/}'
 
 -include .env
 export
@@ -48,6 +50,7 @@ help:
 	@echo "    CASPER_LOOP_INTERVAL=N   Block creation interval in seconds    (default: 1)"
 	@echo "    FAULT_TOLERANCE=F        Finalization threshold 0.0–1.0 (default: 0.0)"
 	@echo "    SYNCHRONY_THRESHOLD=F    Synchrony constraint 0.0–1.0  (default: 0.33, use 0 with HEARTBEAT=0)"
+	@echo "    ADAPTIVE_DEPLOY_CAP=B    Enable adaptive deploy cap true/false (default: true)"
 	@echo "  stop                       Delete chain namespace (wipes all data)"
 	@echo "  restart                    stop + start"
 	@echo "  status                     Show pod status"
@@ -81,7 +84,7 @@ help:
 	@echo "    K6_CAPACITY_DEPLOYS=N    Deploys batched per round (default: 16)"
 	@echo "    K6_CAPACITY_ROUNDS=N     Number of flood→propose rounds (default: 3)"
 	@echo "    K6_PHLO_LIMIT=N          Phlo (gas) per deploy (default: 500000)"
-	@echo "    Recommended: make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000"
+	@echo "    Recommended: make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000 ADAPTIVE_DEPLOY_CAP=false"
 	@echo "  k6-run                     Custom run — see options below"
 	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
 	@echo "    K6_NODE=<validator>      Target node (default: validator1)"
@@ -203,6 +206,7 @@ start:
 		$(_MAX_DEPLOYS_SED) \
 		$(_BLOCK_PROTO_SED) \
 		$(_SYNCHRONY_SED) \
+		$(_ADAPTIVE_CAP_SED) \
 		statefulset-validators.yaml | $(KUBECTL) apply -f -
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
