@@ -36,8 +36,10 @@
  *   SHARD_ID          — shard id (default: root)
  *   TOTAL_DEPLOYS     — deploys to batch per round (default: 64)
  *   ROUNDS            — number of flood→propose rounds (default: 3)
- *   CONFIRM_TIMEOUT   — seconds to wait for block after propose (default: 60)
- *   PROPOSE_DELAY     — seconds to wait after flood before proposing (default: 1)
+ *   CONFIRM_TIMEOUT   — seconds to wait for block after propose (default: 15)
+ *   PROPOSE_DELAY     — seconds to wait after flood before proposing (default: 0)
+ *                       http.batch() is synchronous — deploys are already in the mempool
+ *                       when all 200 responses are received, so no settle time is needed
  */
 import { check, sleep } from "k6";
 import http from "k6/http";
@@ -64,8 +66,8 @@ const DEPLOY_TYPE     = __ENV.DEPLOY_TYPE      || "hello-world";
 const FROM_ADDR       = __ENV.FROM_ADDR        || "";
 const TO_ADDR         = __ENV.TO_ADDR          || "";
 const AMOUNT          = __ENV.AMOUNT           ? parseInt(__ENV.AMOUNT) : 1;
-const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT  ? parseInt(__ENV.CONFIRM_TIMEOUT) : 60;
-const PROPOSE_DELAY   = __ENV.PROPOSE_DELAY    ? parseInt(__ENV.PROPOSE_DELAY) : 1;
+const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT  ? parseInt(__ENV.CONFIRM_TIMEOUT) : 15;
+const PROPOSE_DELAY   = __ENV.PROPOSE_DELAY    ? parseInt(__ENV.PROPOSE_DELAY) : 0;
 const ROUNDS          = __ENV.ROUNDS           ? parseInt(__ENV.ROUNDS) : 3;
 // TOTAL_DEPLOYS is the job.yaml convention for "deploys per round".
 const DEPLOYS_PER_ROUND = __ENV.TOTAL_DEPLOYS  ? parseInt(__ENV.TOTAL_DEPLOYS) : 64;
@@ -93,7 +95,7 @@ export const options = {
       executor: "per-vu-iterations",
       vus: 1,
       iterations: ROUNDS,
-      maxDuration: "10m",
+      maxDuration: "90s",
     },
   },
   thresholds: {
@@ -184,8 +186,8 @@ export default function () {
   }
   console.log(`[round ${roundIndex}] flood: sent=${DEPLOYS_PER_ROUND}, accepted=${accepted}, block=${currentBlock}`);
 
-  // --- 3. Let the mempool settle ---
-  sleep(PROPOSE_DELAY);
+  // --- 3. Optionally wait for mempool to settle (default 0 — batch is synchronous) ---
+  if (PROPOSE_DELAY > 0) sleep(PROPOSE_DELAY);
 
   // --- 4. Propose (deployer-bot style: explicit block creation) ---
   const proposeRes = sendPropose(ADMIN_NODE_URL);
