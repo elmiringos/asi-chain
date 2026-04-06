@@ -42,6 +42,8 @@ spec:
             - ROUNDS=REPLACE_ROUNDS
             - --env
             - PHLO_LIMIT=REPLACE_PHLO_LIMIT
+            - --env
+            - CONFIRM_TIMEOUT=REPLACE_CONFIRM_TIMEOUT
             - --out
             - experimental-prometheus-rw
             - --env

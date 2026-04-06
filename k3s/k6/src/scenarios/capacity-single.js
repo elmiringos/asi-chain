@@ -95,6 +95,9 @@ const confirmationTime = new Trend("deploy_confirmation_ms", true);
 let _maxDeployCount = 0;
 let _roundResults   = [];
 
+// maxDuration = (CONFIRM_TIMEOUT per round + 10s overhead) × ROUNDS, minimum 90s
+const MAX_DURATION_S = Math.max(90, (CONFIRM_TIMEOUT + 10) * ROUNDS);
+
 // 1 VU, ROUNDS iterations — each iteration is a full flood→propose→confirm round.
 export const options = {
   scenarios: {
@@ -102,7 +105,7 @@ export const options = {
       executor: "per-vu-iterations",
       vus: 1,
       iterations: ROUNDS,
-      maxDuration: "90s",
+      maxDuration: `${MAX_DURATION_S}s`,
     },
   },
   thresholds: {

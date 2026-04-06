@@ -84,6 +84,7 @@ help:
 	@echo "    K6_CAPACITY_DEPLOYS=N    Deploys batched per round (default: 16)"
 	@echo "    K6_CAPACITY_ROUNDS=N     Number of flood→propose rounds (default: 3)"
 	@echo "    K6_PHLO_LIMIT=N          Phlo (gas) per deploy (default: 500000)"
+	@echo "    K6_CONFIRM_TIMEOUT=N     Seconds to wait for block after propose (default: 60)"
 	@echo "    Recommended: make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000 ADAPTIVE_DEPLOY_CAP=false"
 	@echo "  k6-run                     Custom run — see options below"
 	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
@@ -374,10 +375,11 @@ k6-burst:
 		K6_DURATION=60s \
 		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 
-K6_CAPACITY_DEPLOYS ?= 16
-K6_CAPACITY_ROUNDS  ?= 3
-K6_DEPLOY_TYPE      ?= hello-world
-K6_PHLO_LIMIT       ?= 500000
+K6_CAPACITY_DEPLOYS   ?= 16
+K6_CAPACITY_ROUNDS    ?= 3
+K6_DEPLOY_TYPE        ?= hello-world
+K6_PHLO_LIMIT         ?= 500000
+K6_CONFIRM_TIMEOUT    ?= 60
 
 k6-capacity:
 	@if [ -z "$(VALIDATOR1_PRIVATE_KEY)" ]; then \
@@ -399,6 +401,7 @@ k6-capacity:
 		-e "s|REPLACE_DEPLOY_TYPE|$(K6_DEPLOY_TYPE)|g" \
 		-e "s|REPLACE_ROUNDS|$(K6_CAPACITY_ROUNDS)|g" \
 		-e "s|REPLACE_PHLO_LIMIT|$(K6_PHLO_LIMIT)|g" \
+		-e "s|REPLACE_CONFIRM_TIMEOUT|$(K6_CONFIRM_TIMEOUT)|g" \
 		k6/capacity-job.yaml | $(KUBECTL) apply -f -; \
 	echo "==> Job $$JOB_NAME started"; \
 	echo "    Node: $$NODE_URL"; \
