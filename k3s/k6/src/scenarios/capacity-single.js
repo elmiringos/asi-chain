@@ -201,8 +201,10 @@ export default function () {
 
   // --- 4. Propose (deployer-bot style: explicit block creation) ---
   const proposeRes = sendPropose(ADMIN_NODE_URL, CONFIRM_TIMEOUT * 1000);
+  let proposeOk = false;
   if (proposeRes.status === 200) {
     console.log(`[round ${roundIndex}] propose OK`);
+    proposeOk = true;
   } else {
     const body = proposeRes.body || "";
     // "NoNewDeploys" means autopropose beat us — deploys already included, not an error.
@@ -210,9 +212,12 @@ export default function () {
     const noNewDeploys = body.includes("NoNewDeploys");
     if (noNewDeploys) {
       console.warn(`[round ${roundIndex}] propose: NoNewDeploys — deploys already included by autopropose`);
+      proposeOk = true; // block was created by autopropose, still wait for it
     } else {
-      console.warn(`[round ${roundIndex}] propose failed: status=${proposeRes.status} body=${body}`);
+      // EOF or other hard failure — node likely crashed. Skip waitForBlock to avoid hanging.
+      console.warn(`[round ${roundIndex}] propose failed: status=${proposeRes.status} body=${body} — skipping waitForBlock`);
       check(proposeRes, { "propose accepted": () => false });
+      return;
     }
   }
 
