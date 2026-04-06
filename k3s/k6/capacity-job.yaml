@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: REPLACE_JOB_NAME
+  namespace: monitoring
+  labels:
+    app: k6
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: k6
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: k6-tests:latest
+          imagePullPolicy: Never
+          env:
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+            - name: K6_PROMETHEUS_RW_TREND_STATS
+              value: p(50),p(95),p(99),count,sum,max
+          args:
+            - run
+            - --env
+            - NODE_URL=REPLACE_NODE_URL
+            - --env
+            - PRIVATE_KEY=REPLACE_PRIVATE_KEY
+            - --env
+            - PRIVATE_KEYS=REPLACE_PRIVATE_KEYS
+            - --env
+            - TOTAL_DEPLOYS=REPLACE_TOTAL_DEPLOYS
+            - --env
+            - FROM_ADDR=REPLACE_FROM_ADDR
+            - --env
+            - TO_ADDR=REPLACE_TO_ADDR
+            - --env
+            - DEPLOY_TYPE=REPLACE_DEPLOY_TYPE
+            - --env
+            - ROUNDS=REPLACE_ROUNDS
+            - --env
+            - PHLO_LIMIT=REPLACE_PHLO_LIMIT
+            - --out
+            - experimental-prometheus-rw
+            - --env
+            - TESTID=REPLACE_JOB_NAME
+            - --tag
+            - testid=REPLACE_JOB_NAME
+            - /scripts/REPLACE_SCRIPT.js
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi

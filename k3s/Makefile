@@ -78,8 +78,9 @@ help:
 	@echo "    BURST_MAX_VUS=N          Cap on VU count to prevent OOM (default: 256)"
 	@echo "  k6-capacity                Single-type capacity: flood→propose→confirm cycles"
 	@echo "    K6_DEPLOY_TYPE=T         hello-world (default) or transfer"
-	@echo "    K6_CAPACITY_DEPLOYS=N    Deploys batched per round (default: 64)"
+	@echo "    K6_CAPACITY_DEPLOYS=N    Deploys batched per round (default: 16)"
 	@echo "    K6_CAPACITY_ROUNDS=N     Number of flood→propose rounds (default: 3)"
+	@echo "    K6_PHLO_LIMIT=N          Phlo (gas) per deploy (default: 500000)"
 	@echo "    Recommended: make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000"
 	@echo "  k6-run                     Custom run — see options below"
 	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
@@ -369,18 +370,35 @@ k6-burst:
 		K6_DURATION=60s \
 		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 
-K6_CAPACITY_DEPLOYS ?= 64
+K6_CAPACITY_DEPLOYS ?= 16
 K6_CAPACITY_ROUNDS  ?= 3
 K6_DEPLOY_TYPE      ?= hello-world
+K6_PHLO_LIMIT       ?= 500000
 
 k6-capacity:
-	@$(MAKE) --no-print-directory k6-run \
-		K6_SCRIPT=scenarios/capacity-single \
-		K6_VUS=1 \
-		K6_TOTAL_DEPLOYS=$(K6_CAPACITY_DEPLOYS) \
-		K6_DURATION=90s \
-		K6_DEPLOY_TYPE=$(K6_DEPLOY_TYPE) \
-		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
+	@if [ -z "$(VALIDATOR1_PRIVATE_KEY)" ]; then \
+		echo "ERROR: VALIDATOR1_PRIVATE_KEY not set. Run 'make gen' first."; exit 1; \
+	fi
+	@RUN_ID=$$(date +%Y-%m-%d-%H-%M-%S); \
+	NODE_URL="http://validator1-0.validator1.asi-chain.svc.cluster.local:40403"; \
+	JOB_NAME="k6-capacity-single-$$RUN_ID"; \
+	sed \
+		-e "s|REPLACE_JOB_NAME|$$JOB_NAME|g" \
+		-e "s|REPLACE_SCRIPT|scenarios/capacity-single|g" \
+		-e "s|REPLACE_RUN_ID|$$RUN_ID|g" \
+		-e "s|REPLACE_NODE_URL|$$NODE_URL|g" \
+		-e "s|REPLACE_PRIVATE_KEYS|$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)|g" \
+		-e "s|REPLACE_TOTAL_DEPLOYS|$(K6_CAPACITY_DEPLOYS)|g" \
+		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
+		-e "s|REPLACE_FROM_ADDR|$(VALIDATOR1_PUBLIC_KEY)|g" \
+		-e "s|REPLACE_TO_ADDR|$(VALIDATOR2_PUBLIC_KEY)|g" \
+		-e "s|REPLACE_DEPLOY_TYPE|$(K6_DEPLOY_TYPE)|g" \
+		-e "s|REPLACE_ROUNDS|$(K6_CAPACITY_ROUNDS)|g" \
+		-e "s|REPLACE_PHLO_LIMIT|$(K6_PHLO_LIMIT)|g" \
+		k6/capacity-job.yaml | $(KUBECTL) apply -f -; \
+	echo "==> Job $$JOB_NAME started"; \
+	echo "    Node: $$NODE_URL"; \
+	echo "    Logs: make k6-logs"
 
 k6-clean:
 	@$(KUBECTL) delete jobs -n monitoring -l app=k6 --ignore-not-found

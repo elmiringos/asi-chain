@@ -35,6 +35,7 @@
  *   AMOUNT            — transfer amount tokens (default: 1)
  *   SHARD_ID          — shard id (default: root)
  *   TOTAL_DEPLOYS     — deploys to batch per round (default: 64)
+ *   PHLO_LIMIT        — phlo (gas) per deploy (default: 500000); lower = more deploys per block
  *   ROUNDS            — number of flood→propose rounds (default: 3)
  *   CONFIRM_TIMEOUT   — seconds to wait for block after propose (default: 15)
  *   PROPOSE_DELAY     — seconds to wait after flood before proposing (default: 0)
@@ -71,6 +72,7 @@ const PROPOSE_DELAY   = __ENV.PROPOSE_DELAY    ? parseInt(__ENV.PROPOSE_DELAY) :
 const ROUNDS          = __ENV.ROUNDS           ? parseInt(__ENV.ROUNDS) : 3;
 // TOTAL_DEPLOYS is the job.yaml convention for "deploys per round".
 const DEPLOYS_PER_ROUND = __ENV.TOTAL_DEPLOYS  ? parseInt(__ENV.TOTAL_DEPLOYS) : 64;
+const PHLO_LIMIT        = __ENV.PHLO_LIMIT      ? parseInt(__ENV.PHLO_LIMIT)   : 500_000;
 
 const PRIVATE_KEYS = (__ENV.PRIVATE_KEYS || __ENV.PRIVATE_KEY || "")
   .split(",")
@@ -84,7 +86,9 @@ const blockNumberGauge = new Gauge("blockchain_block_number");
 const deployPayload    = new Trend("deploy_payload_bytes", true);
 const confirmationTime = new Trend("deploy_confirmation_ms", true);
 
-// Per-VU state — safe with vus: 1
+// Per-VU state — safe with vus: 1.
+// NOTE: handleSummary runs in a separate JS runtime so these are NOT accessible there.
+// Use the k6 Gauge metric (blockchain_block_number range + node API) for final reporting.
 let _maxDeployCount = 0;
 let _roundResults   = [];
 
@@ -125,7 +129,7 @@ export function setup() {
 function buildDeployRequest(term, validAfterBlockNumber, privateKey, index) {
   const deployData = {
     term,
-    phloLimit: 500_000,
+    phloLimit: PHLO_LIMIT,
     phloPrice: 1,
     validAfterBlockNumber,
     // Add index offset so timestamps are unique across the batch.
@@ -225,14 +229,21 @@ export default function () {
 }
 
 export function handleSummary(data) {
+  // _maxDeployCount and _roundResults are NOT available here (separate JS runtime).
+  // The ground-truth max is computed by pushReport from the node API (k6_test_max_deploys_in_block).
+  const m = data.metrics;
+  const startBlock  = m["blockchain_block_number"]?.values?.min ?? 0;
+  const endBlock    = m["blockchain_block_number"]?.values?.max ?? 0;
+  const confirmed   = m["deploy_confirmed"]?.values?.count ?? 0;
+  const unconfirmed = m["deploy_unconfirmed"]?.values?.count ?? 0;
+
   console.log("=== capacity-single results ===");
   console.log(`  deploy type         : ${DEPLOY_TYPE}`);
   console.log(`  deploys / round     : ${DEPLOYS_PER_ROUND}`);
-  console.log(`  rounds              : ${ROUNDS}`);
-  for (const r of _roundResults) {
-    console.log(`  round ${r.round}: block=${r.block}, sent=${r.sent}, deployCount=${r.deployCount}`);
-  }
-  console.log(`  max deploys/block   : ${_maxDeployCount}`);
+  console.log(`  blocks produced     : ${endBlock - startBlock}`);
+  console.log(`  deploys accepted    : ${confirmed}`);
+  console.log(`  deploys rejected    : ${unconfirmed}`);
+  console.log(`  max deploys/block   : see k6_test_max_deploys_in_block in Grafana`);
   console.log("================================");
 
   annotateTestRun(data, "capacity-single");
