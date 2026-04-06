@@ -80,7 +80,7 @@ help:
 	@echo "    K6_DEPLOY_TYPE=T         hello-world (default) or transfer"
 	@echo "    K6_CAPACITY_DEPLOYS=N    Deploys batched per round (default: 64)"
 	@echo "    K6_CAPACITY_ROUNDS=N     Number of flood→propose rounds (default: 3)"
-	@echo "    Recommended: make start HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000"
+	@echo "    Recommended: make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000"
 	@echo "  k6-run                     Custom run — see options below"
 	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
 	@echo "    K6_NODE=<validator>      Target node (default: validator1)"

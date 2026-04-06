@@ -18,9 +18,12 @@
  *     6. Track the maximum deployCount across all rounds.
  *
  * Recommended chain config (run before this scenario):
- *   make start HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000
- *     — disables heartbeat so block creation is purely propose-driven
- *     — raises per-user deploy cap so the real limit is the block proto size
+ *   make start AUTOPROPOSE=0 HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000
+ *     — AUTOPROPOSE=0: disables casper-loop auto-propose so only our explicit POST /api/propose
+ *       creates blocks; without this the loop races our propose and returns NoNewDeploys
+ *     — HEARTBEAT=0: no empty heartbeat blocks between rounds
+ *     — SYNCHRONY_THRESHOLD=0: validator can propose without waiting for peers
+ *     — MAX_DEPLOYS_PER_BLOCK=10000: raises per-user cap so the real limit is the block size
  *
  * Env vars:
  *   NODE_URL          — target validator (default: validator1, port 40403)
@@ -186,11 +189,19 @@ export default function () {
 
   // --- 4. Propose (deployer-bot style: explicit block creation) ---
   const proposeRes = sendPropose(ADMIN_NODE_URL);
-  const proposeOk  = check(proposeRes, { "propose accepted": (r) => r.status === 200 });
-  if (!proposeOk) {
-    console.warn(`[round ${roundIndex}] propose failed: status=${proposeRes.status} body=${proposeRes.body}`);
-  } else {
+  if (proposeRes.status === 200) {
     console.log(`[round ${roundIndex}] propose OK`);
+  } else {
+    const body = proposeRes.body || "";
+    // "NoNewDeploys" means autopropose beat us — deploys already included, not an error.
+    // This happens when AUTOPROPOSE=1; use AUTOPROPOSE=0 to make propose deterministic.
+    const noNewDeploys = body.includes("NoNewDeploys");
+    if (noNewDeploys) {
+      console.warn(`[round ${roundIndex}] propose: NoNewDeploys — deploys already included by autopropose`);
+    } else {
+      console.warn(`[round ${roundIndex}] propose failed: status=${proposeRes.status} body=${body}`);
+      check(proposeRes, { "propose accepted": () => false });
+    }
   }
 
   // --- 5. Wait for the new block ---
