@@ -183,6 +183,9 @@ export function adminUrl(nodeUrl) {
  * @param {string} adminNodeUrl - admin node URL (port 40405); use adminUrl() to derive it
  * @returns k6 response object
  */
-export function sendPropose(adminNodeUrl) {
-  return http.post(`${adminNodeUrl}/api/propose`, null, { headers: JSON_HEADERS });
+export function sendPropose(adminNodeUrl, timeoutMs = 120000) {
+  return http.post(`${adminNodeUrl}/api/propose`, null, {
+    headers: JSON_HEADERS,
+    timeout: `${timeoutMs}ms`,
+  });
 }

@@ -200,7 +200,7 @@ export default function () {
   if (PROPOSE_DELAY > 0) sleep(PROPOSE_DELAY);
 
   // --- 4. Propose (deployer-bot style: explicit block creation) ---
-  const proposeRes = sendPropose(ADMIN_NODE_URL);
+  const proposeRes = sendPropose(ADMIN_NODE_URL, CONFIRM_TIMEOUT * 1000);
   if (proposeRes.status === 200) {
     console.log(`[round ${roundIndex}] propose OK`);
   } else {
