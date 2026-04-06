@@ -159,3 +159,30 @@ export function deployAndCheck(nodeUrl, term, validAfterBlockNumber, privateKey,
     [`${label} has body`]: (r) => !!r.body && r.body.length > 0,
   });
 }
+
+/**
+ * Derives the admin API URL from the main node URL by replacing the HTTP port.
+ * Main port: 40403  →  Admin port: 40405
+ *
+ * @param {string} nodeUrl - main node URL (e.g. http://validator1-0...:40403)
+ * @returns {string} admin URL (e.g. http://validator1-0...:40405)
+ */
+export function adminUrl(nodeUrl) {
+  return nodeUrl.replace(/:40403(\/|$)/, ":40405$1");
+}
+
+/**
+ * Triggers block proposal on a node via POST /api/propose on the ADMIN port (40405).
+ *
+ * The propose endpoint is served exclusively on the admin HTTP port (40405), not the
+ * main port (40403). With autopropose=false the main API returns "read-only node", but
+ * the admin API always allows propose for validator nodes.
+ *
+ * Analogous to the deployer-bot's `cargo run -- propose` step.
+ *
+ * @param {string} adminNodeUrl - admin node URL (port 40405); use adminUrl() to derive it
+ * @returns k6 response object
+ */
+export function sendPropose(adminNodeUrl) {
+  return http.post(`${adminNodeUrl}/api/propose`, null, { headers: JSON_HEADERS });
+}

@@ -33,9 +33,15 @@ spec:
             - --env
             - TOTAL_DEPLOYS=REPLACE_TOTAL_DEPLOYS
             - --env
+            - VUS=REPLACE_VUS
+            - --env
             - FROM_ADDR=REPLACE_FROM_ADDR
             - --env
             - TO_ADDR=REPLACE_TO_ADDR
+            - --env
+            - DEPLOY_TYPE=REPLACE_DEPLOY_TYPE
+            - --env
+            - ROUNDS=REPLACE_ROUNDS
             - --vus
             - "REPLACE_VUS"
             - --duration

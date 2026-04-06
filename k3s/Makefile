@@ -29,7 +29,7 @@ export
 	logs-bootstrap logs-validator1 logs-validator2 logs-validator3 logs-observer \
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
-	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-burst k6-clean k6-dashboard \
+	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-burst k6-capacity k6-clean k6-dashboard \
 	experiment experiment-matrix
 
 help:
@@ -76,6 +76,11 @@ help:
 	@echo "  k6-burst                   Max deploys per block burst     (VUS≤256, 60s)"
 	@echo "    MAX_DEPLOYS_PER_BLOCK=N  Controls total deploys/burst (deploys = N × 4 keys)"
 	@echo "    BURST_MAX_VUS=N          Cap on VU count to prevent OOM (default: 256)"
+	@echo "  k6-capacity                Single-type capacity: flood→propose→confirm cycles"
+	@echo "    K6_DEPLOY_TYPE=T         hello-world (default) or transfer"
+	@echo "    K6_CAPACITY_DEPLOYS=N    Deploys batched per round (default: 64)"
+	@echo "    K6_CAPACITY_ROUNDS=N     Number of flood→propose rounds (default: 3)"
+	@echo "    Recommended: make start HEARTBEAT=0 SYNCHRONY_THRESHOLD=0 MAX_DEPLOYS_PER_BLOCK=10000"
 	@echo "  k6-run                     Custom run — see options below"
 	@echo "    K6_SCRIPT=<path>         Script path under k6/src/ (without .js)"
 	@echo "    K6_NODE=<validator>      Target node (default: validator1)"
@@ -327,6 +332,8 @@ k6-run:
 		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \
 		-e "s|REPLACE_FROM_ADDR|$(VALIDATOR1_PUBLIC_KEY)|g" \
 		-e "s|REPLACE_TO_ADDR|$(VALIDATOR2_PUBLIC_KEY)|g" \
+		-e "s|REPLACE_DEPLOY_TYPE|$(K6_DEPLOY_TYPE)|g" \
+		-e "s|REPLACE_ROUNDS|$(K6_CAPACITY_ROUNDS)|g" \
 		-e "s|REPLACE_VUS|$(K6_VUS)|g" \
 		-e "s|REPLACE_DURATION|$(K6_DURATION)|g" \
 		k6/job.yaml | $(KUBECTL) apply -f -; \
@@ -352,11 +359,6 @@ k6-confirm-transfer:
 k6-mixed:
 	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/mixed-deploy K6_VUS=4 K6_DURATION=120s
 
-k6-capacity-mixed:
-	@$(MAKE) --no-print-directory k6-run K6_SCRIPT=scenarios/capacity-mixed \
-		K6_VUS=1 \
-		K6_TOTAL_DEPLOYS=$(or $(K6_TOTAL_DEPLOYS),1000) \
-		K6_DURATION=5m
 
 k6-burst:
 	$(eval _BURST_TOTAL := $(shell expr $(MAX_DEPLOYS_PER_BLOCK) \* 4))
@@ -365,6 +367,19 @@ k6-burst:
 		K6_VUS=$(_BURST_VUS) \
 		K6_TOTAL_DEPLOYS=$(_BURST_TOTAL) \
 		K6_DURATION=60s \
+		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
+
+K6_CAPACITY_DEPLOYS ?= 64
+K6_CAPACITY_ROUNDS  ?= 3
+K6_DEPLOY_TYPE      ?= hello-world
+
+k6-capacity:
+	@$(MAKE) --no-print-directory k6-run \
+		K6_SCRIPT=scenarios/capacity-single \
+		K6_VUS=1 \
+		K6_TOTAL_DEPLOYS=$(K6_CAPACITY_DEPLOYS) \
+		K6_DURATION=10m \
+		K6_DEPLOY_TYPE=$(K6_DEPLOY_TYPE) \
 		K6_PRIVATE_KEYS="$(VALIDATOR1_PRIVATE_KEY),$(VALIDATOR2_PRIVATE_KEY),$(VALIDATOR3_PRIVATE_KEY),$(VALIDATOR4_PRIVATE_KEY)"
 
 k6-clean:
