@@ -236,20 +236,66 @@ export default function () {
 
 export function handleSummary(data) {
   // _maxDeployCount and _roundResults are NOT available here (separate JS runtime).
-  // The ground-truth max is computed by pushReport from the node API (k6_test_max_deploys_in_block).
+  // All values come from k6 metrics aggregated during the run.
   const m = data.metrics;
+
+  // Block range
   const startBlock  = m["blockchain_block_number"]?.values?.min ?? 0;
   const endBlock    = m["blockchain_block_number"]?.values?.max ?? 0;
-  const confirmed   = m["deploy_confirmed"]?.values?.count ?? 0;
+  const blocksProduced = endBlock - startBlock;
+
+  // Deploy counts
+  const confirmed   = m["deploy_confirmed"]?.values?.count   ?? 0;
   const unconfirmed = m["deploy_unconfirmed"]?.values?.count ?? 0;
+  const roundsDone  = blocksProduced > 0 ? blocksProduced : 1;
+  const avgPerBlock = blocksProduced > 0
+    ? (confirmed / blocksProduced).toFixed(1)
+    : "n/a";
+
+  // Block creation time (ms) — time from propose to block confirmed
+  // In handleSummary, k6 stores median as "med" (not "p(50)")
+  const confirmP50  = m["deploy_confirmation_ms"]?.values?.med       ?? 0;
+  const confirmP95  = m["deploy_confirmation_ms"]?.values?.["p(95)"] ?? 0;
+  const confirmMax  = m["deploy_confirmation_ms"]?.values?.max       ?? 0;
+
+  // Deploy payload size (bytes proto-encoded estimate)
+  // Trend values in handleSummary: avg, min, max, med, p(90), p(95), p(99)
+  const payloadAvg  = m["deploy_payload_bytes"]?.values?.avg  ?? 0;
+  const payloadMax  = m["deploy_payload_bytes"]?.values?.max  ?? 0;
+  const payloadMin  = m["deploy_payload_bytes"]?.values?.min  ?? 0;
+
+  // HTTP request failure rate
+  const httpFailed  = m["http_req_failed"]?.values?.rate ?? 0;
+
+  // Estimated max block data size in KB
+  const maxDeployBytes = payloadMax > 0
+    ? ((DEPLOYS_PER_ROUND * payloadAvg) / 1024).toFixed(1)
+    : "n/a";
 
   console.log("=== capacity-single results ===");
-  console.log(`  deploy type         : ${DEPLOY_TYPE}`);
-  console.log(`  deploys / round     : ${DEPLOYS_PER_ROUND}`);
-  console.log(`  blocks produced     : ${endBlock - startBlock}`);
-  console.log(`  deploys accepted    : ${confirmed}`);
-  console.log(`  deploys rejected    : ${unconfirmed}`);
-  console.log(`  max deploys/block   : see k6_test_max_deploys_in_block in Grafana`);
+  console.log(`  deploy type              : ${DEPLOY_TYPE}`);
+  console.log(`  deploys / round          : ${DEPLOYS_PER_ROUND}`);
+  console.log(`  rounds completed         : ${blocksProduced} / ${ROUNDS}`);
+  console.log("");
+  console.log("  -- Deploy counts --");
+  console.log(`  deploys accepted         : ${confirmed}`);
+  console.log(`  deploys rejected         : ${unconfirmed}`);
+  console.log(`  avg deploys / block      : ${avgPerBlock}`);
+  console.log(`  http failure rate        : ${(httpFailed * 100).toFixed(2)}%`);
+  console.log("");
+  console.log("  -- Block creation time --");
+  console.log(`  confirmation p50         : ${confirmP50.toFixed(0)} ms`);
+  console.log(`  confirmation p95         : ${confirmP95.toFixed(0)} ms`);
+  console.log(`  confirmation max         : ${confirmMax.toFixed(0)} ms`);
+  console.log("");
+  console.log("  -- Deploy payload size --");
+  console.log(`  single deploy min        : ${payloadMin.toFixed(0)} bytes`);
+  console.log(`  single deploy avg        : ${payloadAvg.toFixed(0)} bytes`);
+  console.log(`  single deploy max        : ${payloadMax.toFixed(0)} bytes`);
+  console.log(`  est. block data @ round  : ${maxDeployBytes} KB`);
+  console.log("");
+  console.log("  -- Max deploys in block --");
+  console.log(`  max_in_block             : see pushReport below / Grafana k6_test_max_deploys_in_block`);
   console.log("================================");
 
   annotateTestRun(data, "capacity-single");
