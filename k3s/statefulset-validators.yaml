@@ -148,7 +148,7 @@ spec:
           resources:
             limits:
               cpu: "2500m"
-              memory: 2Gi
+              memory: 3.5G
           volumeMounts:
             - name: data
               mountPath: /var/lib/rnode
@@ -328,7 +328,7 @@ spec:
           resources:
             limits:
               cpu: "2500m"
-              memory: 2Gi
+              memory: 3.5G
           volumeMounts:
             - name: data
               mountPath: /var/lib/rnode
@@ -508,7 +508,7 @@ spec:
           resources:
             limits:
               cpu: "2500m"
-              memory: 2Gi
+              memory: 3.5G
           volumeMounts:
             - name: data
               mountPath: /var/lib/rnode
