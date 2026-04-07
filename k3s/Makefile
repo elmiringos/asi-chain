@@ -20,7 +20,7 @@ _GRPC_RECV_SED          = -e 's/grpc-max-recv-message-size = 256K/grpc-max-recv-
 _BLOCK_PROTO_SED        = -e '/F1R3_BLOCK_PROTO_DECODE_BUFFER_BYTES/{n;s/value: ".*"/value: "$(BLOCK_PROTO_BUFFER)"/}'
 _CASPER_LOOP_SED        = -e 's/casper-loop-interval = [0-9.]* \(ms\|seconds\)/casper-loop-interval = $(CASPER_LOOP_INTERVAL)/'
 _FAULT_TOLERANCE_SED    = -e 's/fault-tolerance-threshold = [0-9.]*/fault-tolerance-threshold = $(FAULT_TOLERANCE)/'
-_SYNCHRONY_SED          = -e '/F1R3_SYNCHRONY_CONSTRAINT_THRESHOLD/{n;s/value: ".*"/value: "$(SYNCHRONY_THRESHOLD)"/}'
+_SYNCHRONY_SED          = -e 's/synchrony-constraint-threshold = [0-9.]*/synchrony-constraint-threshold = $(SYNCHRONY_THRESHOLD)/'
 _ADAPTIVE_CAP_SED       = -e '/F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED/{n;s/value: ".*"/value: "$(ADAPTIVE_DEPLOY_CAP)"/}'
 
 -include .env
@@ -159,6 +159,7 @@ start:
 			$(_GRPC_RECV_SED) \
 			$(_CASPER_LOOP_SED) \
 			$(_FAULT_TOLERANCE_SED) \
+			$(_SYNCHRONY_SED) \
 			$$cm | $(KUBECTL) apply -f -; \
 	done
 	@sed \
