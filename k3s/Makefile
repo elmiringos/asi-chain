@@ -7,9 +7,9 @@ GRPC_STREAM_MSG_SIZE     ?= 256M
 GRPC_RECV_MSG_SIZE       ?= 256K
 BLOCK_PROTO_BUFFER       ?= 65536
 BURST_MAX_VUS            ?= 256
-CASPER_LOOP_INTERVAL     ?= 1
+CASPER_LOOP_INTERVAL     ?= 750 ms
 SYNCHRONY_THRESHOLD      ?= 0.33
-FAULT_TOLERANCE          ?= 0.0
+FAULT_TOLERANCE          ?= 0.1
 ADAPTIVE_DEPLOY_CAP      ?= true
 
 _AUTOPROPOSE_SED        = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
@@ -18,7 +18,7 @@ _MAX_DEPLOYS_SED        = -e '/F1R3_MAX_USER_DEPLOYS_PER_BLOCK/{n;s/value: ".*"/
 _GRPC_STREAM_SED        = -e 's/grpc-max-recv-stream-message-size = .*/grpc-max-recv-stream-message-size = $(GRPC_STREAM_MSG_SIZE)/'
 _GRPC_RECV_SED          = -e 's/grpc-max-recv-message-size = 256K/grpc-max-recv-message-size = $(GRPC_RECV_MSG_SIZE)/'
 _BLOCK_PROTO_SED        = -e '/F1R3_BLOCK_PROTO_DECODE_BUFFER_BYTES/{n;s/value: ".*"/value: "$(BLOCK_PROTO_BUFFER)"/}'
-_CASPER_LOOP_SED        = -e 's/casper-loop-interval = [0-9.]* seconds/casper-loop-interval = $(CASPER_LOOP_INTERVAL) seconds/'
+_CASPER_LOOP_SED        = -e 's/casper-loop-interval = [0-9.]* \(ms\|seconds\)/casper-loop-interval = $(CASPER_LOOP_INTERVAL)/'
 _FAULT_TOLERANCE_SED    = -e 's/fault-tolerance-threshold = [0-9.]*/fault-tolerance-threshold = $(FAULT_TOLERANCE)/'
 _SYNCHRONY_SED          = -e '/F1R3_SYNCHRONY_CONSTRAINT_THRESHOLD/{n;s/value: ".*"/value: "$(SYNCHRONY_THRESHOLD)"/}'
 _ADAPTIVE_CAP_SED       = -e '/F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED/{n;s/value: ".*"/value: "$(ADAPTIVE_DEPLOY_CAP)"/}'

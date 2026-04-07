@@ -23,8 +23,8 @@ spec:
         runAsUser: 0
       containers:
         - name: bootstrap
-          image: public.ecr.aws/f6y9h6x4/asi-chain/node:rust-0.1.0
-          imagePullPolicy: IfNotPresent
+          image: amamata/rust-node:latest
+          imagePullPolicy: Always
           args:
             - "run"
             - "--host=$(NODE_HOST)"

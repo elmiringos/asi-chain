@@ -66,7 +66,7 @@ data:
     }
 
     casper {
-      fault-tolerance-threshold = 0.99
+      fault-tolerance-threshold = 0.1
 
       heartbeat {
         enabled = false
@@ -104,7 +104,7 @@ data:
         bond-maximum = 9223372036854775807
         epoch-length = 10
         quarantine-length = 10
-        number-of-active-validators = 100
+        number-of-active-validators = 10000
         genesis-block-number = 0
         pos-multi-sig-public-keys = [
           REPLACE_V1_PUBKEY,
