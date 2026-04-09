@@ -194,6 +194,9 @@ start:
 		configmap-observer.yaml | $(KUBECTL) apply -f -
 	@sed $(_NAMESPACE_SED) pvcs.yaml | $(KUBECTL) apply -f -
 	@sed $(_NAMESPACE_SED) services.yaml | $(KUBECTL) apply -f -
+	@if [ "$(NAMESPACE)" = "asi-chain" ]; then \
+		$(KUBECTL) apply -f services-ext.yaml; \
+	fi
 
 	@echo ""
 	@echo "==> Creating bootstrap TLS secret..."
