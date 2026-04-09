@@ -118,7 +118,10 @@ help:
 	@echo "    SCENARIO=<name>          confirm-hello | mixed     (default: confirm-hello)"
 	@echo "  experiment-matrix          Full heartbeat sweep matrix, sequential (~40 min)"
 	@echo "  experiment-parallel        Full heartbeat sweep matrix, parallel (~10 min)"
-	@echo "    PHASE=phase1/phase2/phase3/all  Which phase to run (default: all)"
+	@echo "    PHASE=phase1/.../phase5/p45/all  Which phase to run (default: all)"
+	@echo "    phase4: max-lfb-age sweep (ci=1s, cd=2s, vu=5)"
+	@echo "    phase5: synchrony-threshold + block limit (ci=1s, cd=2s, vu=10)"
+	@echo "    p45:    phases 4+5 combined"
 	@echo "    CLEANUP=0                Keep experiment namespaces after run"
 	@echo ""
 
@@ -458,4 +461,4 @@ experiment-matrix:
 PHASE   ?= all
 
 experiment-parallel:
-	@CLEANUP=$(CLEANUP) K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)
+	@CLEANUP=$(CLEANUP) EXP_K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)

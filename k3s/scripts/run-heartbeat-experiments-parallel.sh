@@ -21,7 +21,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
 PHASE="${1:-all}"
 CLEANUP="${CLEANUP:-1}"       # set CLEANUP=0 to keep namespaces for debugging
-K6_DURATION="${K6_DURATION:-300s}"  # test duration per experiment (default: 5 min)
+K6_DURATION="${EXP_K6_DURATION:-300s}"  # test duration per experiment (default: 5 min)
 LOG_DIR="${ROOT_DIR}/logs/parallel-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$LOG_DIR"
 
@@ -38,7 +38,7 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 # Deploy a chain in a given namespace with given heartbeat params.
 # Writes to LOG_DIR/<tag>-deploy.log
 deploy_chain() {
-  local ns="$1" tag="$2" interval="$3" lfb_age="$4" cooldown="$5"
+  local ns="$1" tag="$2" interval="$3" lfb_age="$4" cooldown="$5" synchrony="$6" max_deploys="$7"
   log "[${tag}] Deploying chain in namespace ${ns}..."
   make -C "$ROOT_DIR" start \
     KUBECTL="sudo kubectl" \
@@ -47,6 +47,8 @@ deploy_chain() {
     HEARTBEAT_INTERVAL="$interval" \
     HEARTBEAT_LFB_AGE="$lfb_age" \
     HEARTBEAT_COOLDOWN="$cooldown" \
+    SYNCHRONY_THRESHOLD="$synchrony" \
+    MAX_DEPLOYS_PER_BLOCK="$max_deploys" \
     > "${LOG_DIR}/${tag}-deploy.log" 2>&1
   log "[${tag}] Chain deployed"
 }
@@ -103,9 +105,17 @@ run_k6() {
     log "[${tag}] WARNING: could not parse k6 job name from output"
     return 0
   fi
-  log "[${tag}] Waiting for k6 job: ${job}"
+  # Wait timeout = duration + 10 min buffer for startup/teardown
+  local duration_sec
+  duration_sec=$(echo "$K6_DURATION" | sed 's/s$//' | awk '{
+    if ($0 ~ /h/) { split($0, a, "h"); print a[1]*3600 + (a[2]+0)*60 }
+    else if ($0 ~ /m/) { split($0, a, "m"); print a[1]*60 + (a[2]+0) }
+    else print $0 + 0
+  }')
+  local wait_timeout=$(( duration_sec + 600 ))s
+  log "[${tag}] Waiting for k6 job: ${job} (timeout=${wait_timeout})"
   $KUBECTL wait --for=condition=complete "job/${job}" -n monitoring \
-    --timeout=300s >> "$start_log" 2>&1 || \
+    --timeout="${wait_timeout}" >> "$start_log" 2>&1 || \
     log "[${tag}] WARNING: k6 job ${job} did not complete cleanly"
   # Save k6 pod output to disk
   $KUBECTL logs -n monitoring -l "job-name=${job}" --tail=-1 \
@@ -135,48 +145,75 @@ teardown_chain() {
 }
 
 # ── Experiment matrix ──────────────────────────────────────────────────────
-# Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario"
+# Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario|synchrony_threshold|max_deploys"
+# Defaults when omitted: synchrony_threshold=0.33, max_deploys=32
 
 PHASE1_MATRIX=(
-  "0.2|2|1|2|confirm-hello"
-  "0.5|2|1|2|confirm-hello"
-  "1|2|1|2|confirm-hello"
+  "0.2|2|1|2|confirm-hello|0.33|32"
+  "0.5|2|1|2|confirm-hello|0.33|32"
+  "1|2|1|2|confirm-hello|0.33|32"
 )
 
 PHASE2_MATRIX=(
-  "0.5|2|1|2|confirm-hello"   # baseline (shared with phase 1)
-  "0.5|2|0.5|2|confirm-hello"
-  "0.5|2|2|2|confirm-hello"
-  "0.5|2|5|2|confirm-hello"
+  "0.5|2|1|2|confirm-hello|0.33|32"   # baseline
+  "0.5|2|0.5|2|confirm-hello|0.33|32"
+  "0.5|2|2|2|confirm-hello|0.33|32"
+  "0.5|2|5|2|confirm-hello|0.33|32"
 )
 
 PHASE3_MATRIX=(
-  "0.5|2|1|2|confirm-hello"   # baseline
-  "0.5|2|1|5|confirm-hello"
-  "0.5|2|1|10|confirm-hello"
-  "0.5|2|1|20|confirm-hello"
+  "0.5|2|1|2|confirm-hello|0.33|32"   # baseline
+  "0.5|2|1|5|confirm-hello|0.33|32"
+  "0.5|2|1|10|confirm-hello|0.33|32"
+  "0.5|2|1|20|confirm-hello|0.33|32"
+)
+
+# Phase 4: max-lfb-age sweep — how quickly heartbeat reacts to missing blocks
+# Best config from phases 1-2: ci=1s, cd=2s. Fixed: vu=5, threshold=0.33, max_deploys=32
+PHASE4_MATRIX=(
+  "1|0.5|2|5|confirm-hello|0.33|32"
+  "1|1|2|5|confirm-hello|0.33|32"
+  "1|2|2|5|confirm-hello|0.33|32"   # baseline
+)
+
+# Phase 5: synchrony-threshold + block limit sweep
+# Goal: eliminate sync_warn bottleneck and measure throughput ceiling
+# Best config: ci=1s, cd=2s, lfb=2s, vu=10
+PHASE5_MATRIX=(
+  "1|2|2|10|confirm-hello|0.33|32"    # baseline (threshold=0.33, limit=32)
+  "1|2|2|10|confirm-hello|0|32"       # threshold=0 (remove sync constraint)
+  "1|2|2|10|confirm-hello|0|128"      # threshold=0 + high block limit
+  "1|2|2|10|confirm-hello|0.33|128"   # original threshold + high block limit
 )
 
 case "$PHASE" in
   phase1) MATRIX=("${PHASE1_MATRIX[@]}") ;;
   phase2) MATRIX=("${PHASE2_MATRIX[@]}") ;;
   phase3) MATRIX=("${PHASE3_MATRIX[@]}") ;;
+  phase4) MATRIX=("${PHASE4_MATRIX[@]}") ;;
+  phase5) MATRIX=("${PHASE5_MATRIX[@]}") ;;
   all)
-    # Deduplicate: phase1[1] = phase2[0] = phase3[0] (0.5|2|1|2)
     MATRIX=(
-      "0.2|2|1|2|confirm-hello"
-      "0.5|2|1|2|confirm-hello"
-      "1|2|1|2|confirm-hello"
-      "0.5|2|0.5|2|confirm-hello"
-      "0.5|2|2|2|confirm-hello"
-      "0.5|2|5|2|confirm-hello"
-      "0.5|2|1|5|confirm-hello"
-      "0.5|2|1|10|confirm-hello"
-      "0.5|2|1|20|confirm-hello"
+      "0.2|2|1|2|confirm-hello|0.33|32"
+      "0.5|2|1|2|confirm-hello|0.33|32"
+      "1|2|1|2|confirm-hello|0.33|32"
+      "0.5|2|0.5|2|confirm-hello|0.33|32"
+      "0.5|2|2|2|confirm-hello|0.33|32"
+      "0.5|2|5|2|confirm-hello|0.33|32"
+      "0.5|2|1|5|confirm-hello|0.33|32"
+      "0.5|2|1|10|confirm-hello|0.33|32"
+      "0.5|2|1|20|confirm-hello|0.33|32"
+    )
+    ;;
+  p45)
+    # Phases 4+5 only — for overnight follow-up run
+    MATRIX=(
+      "${PHASE4_MATRIX[@]}"
+      "${PHASE5_MATRIX[@]}"
     )
     ;;
   *)
-    echo "Usage: $0 [all|phase1|phase2|phase3]"
+    echo "Usage: $0 [all|phase1|phase2|phase3|phase4|phase5|p45]"
     exit 1
     ;;
 esac
@@ -196,11 +233,18 @@ log "  Logs: ${LOG_DIR}"
 log "=============================="
 
 # Compute tags and namespaces
-declare -a TAGS NAMESPACES INTERVALS LFB_AGES COOLDOWNS VUS_LIST SCENARIOS
+declare -a TAGS NAMESPACES INTERVALS LFB_AGES COOLDOWNS VUS_LIST SCENARIOS SYNCHRONY_LIST MAX_DEPLOYS_LIST
 
 for entry in "${MATRIX[@]}"; do
-  IFS='|' read -r interval lfb_age cooldown vus scenario <<< "$entry"
+  IFS='|' read -r interval lfb_age cooldown vus scenario synchrony max_deploys <<< "$entry"
+  synchrony="${synchrony:-0.33}"
+  max_deploys="${max_deploys:-32}"
+
+  # Include non-default params in tag for clarity
   tag="hb-${scenario}-ci${interval}s-lfb${lfb_age}s-cd${cooldown}s-vu${vus}"
+  [ "$synchrony"   != "0.33" ] && tag="${tag}-sy${synchrony}"
+  [ "$max_deploys" != "32"   ] && tag="${tag}-md${max_deploys}"
+
   ns=$(make_ns "$tag")
   TAGS+=("$tag")
   NAMESPACES+=("$ns")
@@ -209,6 +253,8 @@ for entry in "${MATRIX[@]}"; do
   COOLDOWNS+=("$cooldown")
   VUS_LIST+=("$vus")
   SCENARIOS+=("$scenario")
+  SYNCHRONY_LIST+=("$synchrony")
+  MAX_DEPLOYS_LIST+=("$max_deploys")
 done
 
 # ── Phase A: Deploy all chains in parallel ─────────────────────────────────
@@ -218,7 +264,8 @@ log "--- Phase A: deploying ${#MATRIX[@]} chains in parallel ---"
 declare -a DEPLOY_PIDS
 for i in "${!TAGS[@]}"; do
   deploy_chain "${NAMESPACES[$i]}" "${TAGS[$i]}" \
-    "${INTERVALS[$i]}" "${LFB_AGES[$i]}" "${COOLDOWNS[$i]}" &
+    "${INTERVALS[$i]}" "${LFB_AGES[$i]}" "${COOLDOWNS[$i]}" \
+    "${SYNCHRONY_LIST[$i]}" "${MAX_DEPLOYS_LIST[$i]}" &
   DEPLOY_PIDS+=($!)
 done
 
