@@ -20,7 +20,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
 PHASE="${1:-all}"
-CLEANUP="${CLEANUP:-1}"    # set CLEANUP=0 to keep namespaces for debugging
+CLEANUP="${CLEANUP:-1}"       # set CLEANUP=0 to keep namespaces for debugging
+K6_DURATION="${K6_DURATION:-300s}"  # test duration per experiment (default: 5 min)
 LOG_DIR="${ROOT_DIR}/logs/parallel-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$LOG_DIR"
 
@@ -92,7 +93,7 @@ run_k6() {
     NAMESPACE="$ns" \
     K6_SCRIPT="$k6_script" \
     K6_VUS="$vus" \
-    K6_DURATION="120s" \
+    K6_DURATION="$K6_DURATION" \
     K6_TAG="$tag" \
     > "$start_log" 2>&1
   # Parse job name from make output: "==> Job k6-<tag>-<runid> started"
@@ -106,12 +107,28 @@ run_k6() {
   $KUBECTL wait --for=condition=complete "job/${job}" -n monitoring \
     --timeout=300s >> "$start_log" 2>&1 || \
     log "[${tag}] WARNING: k6 job ${job} did not complete cleanly"
+  # Save k6 pod output to disk
+  $KUBECTL logs -n monitoring -l "job-name=${job}" --tail=-1 \
+    > "${LOG_DIR}/${tag}-k6.log" 2>/dev/null || true
   log "[${tag}] k6 done: ${tag}"
+}
+
+# Save logs from all node pods to disk before teardown.
+collect_node_logs() {
+  local ns="$1" tag="$2"
+  local node_log_dir="${LOG_DIR}/${tag}-nodes"
+  mkdir -p "$node_log_dir"
+  log "[${tag}] Collecting node logs → ${node_log_dir}/"
+  for pod in bootstrap-0 validator1-0 validator2-0 validator3-0 validator4-0 observer-0; do
+    $KUBECTL logs "$pod" -n "$ns" \
+      > "${node_log_dir}/${pod}.log" 2>/dev/null || true
+  done
 }
 
 # Tear down the chain namespace.
 teardown_chain() {
   local ns="$1" tag="$2"
+  collect_node_logs "$ns" "$tag"
   log "[${tag}] Tearing down namespace ${ns}..."
   $KUBECTL delete namespace "$ns" --ignore-not-found \
     >> "${LOG_DIR}/${tag}-deploy.log" 2>&1 || true

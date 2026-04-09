@@ -284,8 +284,6 @@ monitoring-start:
 	@$(KUBECTL) apply -f monitoring/namespace.yaml
 	@$(KUBECTL) apply -f monitoring/node-exporter.yaml
 	@$(KUBECTL) apply -f monitoring/prometheus.yaml
-	@$(KUBECTL) apply -f monitoring/loki.yaml
-	@$(KUBECTL) apply -f monitoring/promtail.yaml
 	@$(KUBECTL) apply -f monitoring/firefly-exporter.yaml
 	@$(KUBECTL) apply -f monitoring/pushgateway.yaml
 	@$(KUBECTL) apply -f monitoring/grafana.yaml
@@ -460,4 +458,4 @@ experiment-matrix:
 PHASE   ?= all
 
 experiment-parallel:
-	@CLEANUP=$(CLEANUP) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)
+	@CLEANUP=$(CLEANUP) K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)
