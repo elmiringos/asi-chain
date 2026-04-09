@@ -74,30 +74,32 @@ data:
           - source_labels: [__meta_kubernetes_node_name]
             target_label: node
 
-      - job_name: validators
+      - job_name: asi-chain-nodes
         metrics_path: /metrics
-        static_configs:
-          - targets:
-              - validator1-0.validator1.asi-chain.svc.cluster.local:40403
-              - validator2-0.validator2.asi-chain.svc.cluster.local:40403
-              - validator3-0.validator3.asi-chain.svc.cluster.local:40403
+        kubernetes_sd_configs:
+          - role: pod
         relabel_configs:
-          - source_labels: [__address__]
-            regex: "([^.]+).*"
+          # Only scrape pods belonging to an asi-chain deployment (any namespace)
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: asi-chain
+            action: keep
+          # Only scrape pods that are Running
+          - source_labels: [__meta_kubernetes_pod_phase]
+            regex: Running
+            action: keep
+          # Scrape port 40403
+          - source_labels: [__meta_kubernetes_pod_ip]
+            replacement: $1:40403
+            target_label: __address__
+          # instance = pod name (e.g. validator1-0, bootstrap-0)
+          - source_labels: [__meta_kubernetes_pod_name]
             target_label: instance
-            replacement: "$1"
-
-      - job_name: bootstrap
-        metrics_path: /metrics
-        static_configs:
-          - targets:
-              - bootstrap-0.bootstrap.asi-chain.svc.cluster.local:40403
-
-      - job_name: observer
-        metrics_path: /metrics
-        static_configs:
-          - targets:
-              - observer-0.observer.asi-chain.svc.cluster.local:40403
+          # role label from pod label (validator, bootstrap, observer)
+          - source_labels: [__meta_kubernetes_pod_label_role]
+            target_label: role
+          # namespace label so Grafana can filter by experiment
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
 
       - job_name: firefly-exporter
         honor_labels: true

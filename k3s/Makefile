@@ -10,7 +10,11 @@ BURST_MAX_VUS            ?= 256
 CASPER_LOOP_INTERVAL     ?= 750 ms
 SYNCHRONY_THRESHOLD      ?= 0.33
 FAULT_TOLERANCE          ?= 0.1
-ADAPTIVE_DEPLOY_CAP      ?= true
+ADAPTIVE_DEPLOY_CAP      ?= 1
+HEARTBEAT_INTERVAL       ?= 5
+HEARTBEAT_LFB_AGE        ?= 5
+HEARTBEAT_COOLDOWN       ?= 15
+CLEANUP                  ?= 1
 
 _AUTOPROPOSE_SED        = $(if $(filter 0,$(AUTOPROPOSE)),-e '/--autopropose/d',)
 _HEARTBEAT_SED          = $(if $(filter 0,$(HEARTBEAT)),-e 's/enabled = true/enabled = false/g',)
@@ -22,6 +26,10 @@ _CASPER_LOOP_SED        = -e 's/casper-loop-interval = [0-9.]* \(ms\|seconds\)/c
 _FAULT_TOLERANCE_SED    = -e 's/fault-tolerance-threshold = [0-9.]*/fault-tolerance-threshold = $(FAULT_TOLERANCE)/'
 _SYNCHRONY_SED          = -e 's/synchrony-constraint-threshold = [0-9.]*/synchrony-constraint-threshold = $(SYNCHRONY_THRESHOLD)/'
 _ADAPTIVE_CAP_SED       = -e '/F1R3_ADAPTIVE_DEPLOY_CAP_ENABLED/{n;s/value: ".*"/value: "$(ADAPTIVE_DEPLOY_CAP)"/}'
+_HEARTBEAT_INTERVAL_SED = -e 's/check-interval = [0-9.]* \(seconds\|ms\)/check-interval = $(HEARTBEAT_INTERVAL) seconds/'
+_HEARTBEAT_LFB_SED      = -e 's/max-lfb-age = [0-9.]* \(seconds\|ms\)/max-lfb-age = $(HEARTBEAT_LFB_AGE) seconds/'
+_HEARTBEAT_COOLDOWN_SED = -e 's/self-propose-cooldown = [0-9.]* \(seconds\|ms\)/self-propose-cooldown = $(HEARTBEAT_COOLDOWN) seconds/'
+_NAMESPACE_SED          = -e "s/asi-chain/$(NAMESPACE)/g"
 
 -include .env
 export
@@ -32,7 +40,7 @@ export
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
 	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-burst k6-capacity k6-clean k6-dashboard \
-	experiment experiment-matrix
+	experiment experiment-matrix experiment-parallel
 
 help:
 	@echo ""
@@ -51,6 +59,10 @@ help:
 	@echo "    FAULT_TOLERANCE=F        Finalization threshold 0.0–1.0 (default: 0.0)"
 	@echo "    SYNCHRONY_THRESHOLD=F    Synchrony constraint 0.0–1.0  (default: 0.33, use 0 with HEARTBEAT=0)"
 	@echo "    ADAPTIVE_DEPLOY_CAP=B    Enable adaptive deploy cap true/false (default: true)"
+	@echo "    HEARTBEAT_INTERVAL=N     Heartbeat check-interval in seconds  (default: 5)"
+	@echo "    HEARTBEAT_LFB_AGE=N      Heartbeat max-lfb-age in seconds     (default: 5)"
+	@echo "    HEARTBEAT_COOLDOWN=N     Heartbeat self-propose-cooldown in s  (default: 15)"
+	@echo "    NAMESPACE=name           Deploy to custom namespace (default: asi-chain)"
 	@echo "  stop                       Delete chain namespace (wipes all data)"
 	@echo "  restart                    stop + start"
 	@echo "  status                     Show pod status"
@@ -104,7 +116,10 @@ help:
 	@echo "    COOLDOWN=<ms>            self-propose cooldown ms  (default: 5000)"
 	@echo "    K6_VUS=<n>               Virtual users             (default: 2)"
 	@echo "    SCENARIO=<name>          confirm-hello | mixed     (default: confirm-hello)"
-	@echo "  experiment-matrix          Full heartbeat sweep matrix (~40 min)"
+	@echo "  experiment-matrix          Full heartbeat sweep matrix, sequential (~40 min)"
+	@echo "  experiment-parallel        Full heartbeat sweep matrix, parallel (~10 min)"
+	@echo "    PHASE=phase1/phase2/phase3/all  Which phase to run (default: all)"
+	@echo "    CLEANUP=0                Keep experiment namespaces after run"
 	@echo ""
 
 # Generate all keys (bootstrap TLS + validator secp256k1) → writes .env
@@ -141,12 +156,13 @@ start:
 	fi
 
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
-	@$(KUBECTL) apply -f namespace.yaml
+	@sed $(_NAMESPACE_SED) namespace.yaml | $(KUBECTL) apply -f -
 	@sed \
 		-e "s/REPLACE_V1_WALLET_ADDR/$(VALIDATOR1_WALLET_ADDR)/g" \
 		-e "s/REPLACE_V2_WALLET_ADDR/$(VALIDATOR2_WALLET_ADDR)/g" \
 		-e "s/REPLACE_V3_WALLET_ADDR/$(VALIDATOR3_WALLET_ADDR)/g" \
 		-e "s/REPLACE_V4_WALLET_ADDR/$(VALIDATOR4_WALLET_ADDR)/g" \
+		$(_NAMESPACE_SED) \
 		configmap-wallets.yaml | $(KUBECTL) apply -f -
 	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml; do \
 		sed \
@@ -160,6 +176,10 @@ start:
 			$(_CASPER_LOOP_SED) \
 			$(_FAULT_TOLERANCE_SED) \
 			$(_SYNCHRONY_SED) \
+			$(_HEARTBEAT_INTERVAL_SED) \
+			$(_HEARTBEAT_LFB_SED) \
+			$(_HEARTBEAT_COOLDOWN_SED) \
+			$(_NAMESPACE_SED) \
 			$$cm | $(KUBECTL) apply -f -; \
 	done
 	@sed \
@@ -170,9 +190,10 @@ start:
 		$(_HEARTBEAT_SED) \
 		$(_GRPC_STREAM_SED) \
 		$(_GRPC_RECV_SED) \
+		$(_NAMESPACE_SED) \
 		configmap-observer.yaml | $(KUBECTL) apply -f -
-	@$(KUBECTL) apply -f pvcs.yaml
-	@$(KUBECTL) apply -f services.yaml
+	@sed $(_NAMESPACE_SED) pvcs.yaml | $(KUBECTL) apply -f -
+	@sed $(_NAMESPACE_SED) services.yaml | $(KUBECTL) apply -f -
 
 	@echo ""
 	@echo "==> Creating bootstrap TLS secret..."
@@ -189,6 +210,7 @@ start:
 		$(_MAX_DEPLOYS_SED) \
 		$(_BLOCK_PROTO_SED) \
 		$(_SYNCHRONY_SED) \
+		$(_NAMESPACE_SED) \
 		statefulset-bootstrap.yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) rollout status statefulset/bootstrap -n $(NAMESPACE) --timeout=120s
 
@@ -209,10 +231,12 @@ start:
 		$(_BLOCK_PROTO_SED) \
 		$(_SYNCHRONY_SED) \
 		$(_ADAPTIVE_CAP_SED) \
+		$(_NAMESPACE_SED) \
 		statefulset-validators.yaml | $(KUBECTL) apply -f -
 	@sed \
 		-e "s/REPLACE_ME/$(BOOTSTRAP_NODE_ID)/g" \
 		$(_MAX_DEPLOYS_SED) \
+		$(_NAMESPACE_SED) \
 		statefulset-observer.yaml | $(KUBECTL) apply -f -
 
 	@echo ""
@@ -429,3 +453,8 @@ experiment:
 
 experiment-matrix:
 	@bash scripts/heartbeat-experiment-matrix.sh
+
+PHASE   ?= all
+
+experiment-parallel:
+	@CLEANUP=$(CLEANUP) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)
