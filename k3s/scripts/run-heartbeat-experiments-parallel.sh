@@ -183,6 +183,12 @@ esac
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
+# ── Pre-flight checks ─────────────────────────────────────────────────────
+if ! $KUBECTL get namespace monitoring &>/dev/null; then
+  echo "ERROR: 'monitoring' namespace not found. Run 'make monitoring-start' first."
+  exit 1
+fi
+
 log "=============================="
 log "  Parallel Experiment Runner"
 log "  Phase: ${PHASE} | ${#MATRIX[@]} experiments"
