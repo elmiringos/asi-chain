@@ -40,6 +40,7 @@ deploy_chain() {
   local ns="$1" tag="$2" interval="$3" lfb_age="$4" cooldown="$5"
   log "[${tag}] Deploying chain in namespace ${ns}..."
   make -C "$ROOT_DIR" start \
+    KUBECTL="sudo kubectl" \
     NAMESPACE="$ns" \
     HEARTBEAT=1 \
     HEARTBEAT_INTERVAL="$interval" \
@@ -87,6 +88,7 @@ run_k6() {
   esac
   local start_log="${LOG_DIR}/${tag}-k6-start.log"
   make -C "$ROOT_DIR" k6-run \
+    KUBECTL="sudo kubectl" \
     NAMESPACE="$ns" \
     K6_SCRIPT="$k6_script" \
     K6_VUS="$vus" \
