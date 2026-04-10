@@ -163,39 +163,7 @@ start:
 
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
 	@sed $(_NAMESPACE_SED) namespace.yaml | $(KUBECTL) apply -f -
-	@python3 -c "
-import sys
-env_vars = {}
-try:
-    with open('.env') as f:
-        for line in f:
-            line = line.strip()
-            if '=' in line and not line.startswith('#'):
-                k, v = line.split('=', 1)
-                env_vars[k] = v
-except FileNotFoundError:
-    pass
-ns = '$(NAMESPACE)'
-lines = [
-    'apiVersion: v1',
-    'kind: ConfigMap',
-    'metadata:',
-    '  name: wallets',
-    f'  namespace: {ns}',
-    'data:',
-    '  wallets.txt: |',
-]
-for i in range(1, 5):
-    addr = env_vars.get(f'VALIDATOR{i}_WALLET_ADDR', '')
-    if addr:
-        lines.append(f'    {addr},9000000000000000000')
-for i in range(1, 100):
-    addr = env_vars.get(f'K6_WALLET{i}_WALLET_ADDR', '')
-    if not addr:
-        break
-    lines.append(f'    {addr},1000000000000000000')
-print('\n'.join(lines))
-" | $(KUBECTL) apply -f -
+	@python3 scripts/gen-wallets-configmap.py "$(NAMESPACE)" | $(KUBECTL) apply -f -
 	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml; do \
 		sed \
 			-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
