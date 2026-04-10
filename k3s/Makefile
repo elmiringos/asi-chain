@@ -40,7 +40,7 @@ export
 	monitoring-start monitoring-stop \
 	api-build api-start api-stop logs-api \
 	k6-build k6-run k6-logs k6-hello-world k6-transfer k6-confirm-hello k6-confirm-transfer k6-mixed k6-burst k6-capacity k6-clean k6-dashboard \
-	experiment experiment-matrix experiment-parallel
+	experiment experiment-matrix experiment-parallel experiment-clean
 
 help:
 	@echo ""
@@ -118,6 +118,7 @@ help:
 	@echo "    SCENARIO=<name>          confirm-hello | mixed     (default: confirm-hello)"
 	@echo "  experiment-matrix          Full heartbeat sweep matrix, sequential (~40 min)"
 	@echo "  experiment-parallel        Full heartbeat sweep matrix, parallel (~10 min)"
+	@echo "  experiment-clean           Delete all exp-* namespaces and k6 jobs"
 	@echo "    PHASE=phase1/.../phase5/p45/all  Which phase to run (default: all)"
 	@echo "    phase4: max-lfb-age sweep (ci=1s, cd=2s, vu=5)"
 	@echo "    phase5: synchrony-threshold + block limit (ci=1s, cd=2s, vu=10)"
@@ -463,3 +464,12 @@ PHASE   ?= all
 
 experiment-parallel:
 	@CLEANUP=$(CLEANUP) EXP_K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)
+
+experiment-clean:
+	@echo "==> Deleting all experiment namespaces (exp-*)..."
+	@$(KUBECTL) get namespaces -o name | grep "^namespace/exp-" | sed 's|namespace/||' | \
+		xargs -r $(KUBECTL) delete namespace --ignore-not-found
+	@echo "==> Deleting completed/failed k6 jobs in monitoring..."
+	@$(KUBECTL) get jobs -n monitoring -o name | grep "^job/k6-" | \
+		xargs -r $(KUBECTL) delete -n monitoring --ignore-not-found
+	@echo "==> Done"
