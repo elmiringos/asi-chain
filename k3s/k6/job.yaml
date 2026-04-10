@@ -27,6 +27,8 @@ spec:
             - --env
             - NODE_URL=REPLACE_NODE_URL
             - --env
+            - WALLET_KEYS=REPLACE_WALLET_KEYS
+            - --env
             - PRIVATE_KEY=REPLACE_PRIVATE_KEY
             - --env
             - PRIVATE_KEYS=REPLACE_PRIVATE_KEYS

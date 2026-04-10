@@ -1,6 +1,7 @@
 import http from "k6/http";
 import { check } from "k6";
-import { signDeploy, helloWorldTerm, transferTerm as _transferTerm } from "k6/x/asichain";
+import { signDeploy, helloWorldTerm, transferTerm as _transferTerm, waitForFinalization } from "k6/x/asichain";
+export { waitForFinalization };
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -35,17 +36,37 @@ export function getValidAfterBlockNumber(nodeUrl) {
 }
 
 /**
- * Returns { blockNumber, deployCount } for the latest block.
- * deployCount comes from LightBlockInfo.deployCount (proto field 18).
+ * Returns { blockNumber, deployCount, timestamp } for the latest block in the DAG.
+ * Note: this block may not yet be finalized.
  */
 export function getLatestBlockInfo(nodeUrl) {
   const res = http.get(`${nodeUrl}/api/blocks/1`);
   if (res.status !== 200) {
     console.error(`getLatestBlockInfo: status=${res.status} from ${nodeUrl}`);
-    return { blockNumber: 0, deployCount: 0 };
+    return { blockNumber: 0, deployCount: 0, timestamp: 0 };
   }
   const blocks = res.json();
   const b = blocks && blocks[0];
+  return {
+    blockNumber: (b && b.blockNumber) || 0,
+    deployCount: (b && b.deployCount) || 0,
+    timestamp: (b && b.timestamp) || 0,
+  };
+}
+
+/**
+ * Returns { blockNumber, deployCount, timestamp } for the last FINALIZED block.
+ * Uses /api/last-finalized-block which returns BlockInfoSerde:
+ * { blockInfo: { blockNumber, ... }, deploys: [...] }
+ */
+export function getLastFinalizedBlockInfo(nodeUrl) {
+  const res = http.get(`${nodeUrl}/api/last-finalized-block`);
+  if (res.status !== 200) {
+    console.error(`getLastFinalizedBlockInfo: status=${res.status} from ${nodeUrl}`);
+    return { blockNumber: 0, deployCount: 0, timestamp: 0 };
+  }
+  const data = res.json();
+  const b = data && data.blockInfo;
   return {
     blockNumber: (b && b.blockNumber) || 0,
     deployCount: (b && b.deployCount) || 0,

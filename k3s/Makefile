@@ -143,6 +143,9 @@ gen:
 		echo "NETWORK_ID=testnet"; \
 		echo ""; \
 		python3 gen_validator_keys.py 4; \
+		echo ""; \
+		echo "# k6 load-test wallets (one per VU, funded at genesis)"; \
+		python3 gen_validator_keys.py 32 K6_WALLET; \
 	} > .env; \
 	echo "Bootstrap Node ID: $$NODE_ID"; \
 	echo "==> Written to .env (contains private keys — do not commit)"
@@ -160,13 +163,39 @@ start:
 
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
 	@sed $(_NAMESPACE_SED) namespace.yaml | $(KUBECTL) apply -f -
-	@sed \
-		-e "s/REPLACE_V1_WALLET_ADDR/$(VALIDATOR1_WALLET_ADDR)/g" \
-		-e "s/REPLACE_V2_WALLET_ADDR/$(VALIDATOR2_WALLET_ADDR)/g" \
-		-e "s/REPLACE_V3_WALLET_ADDR/$(VALIDATOR3_WALLET_ADDR)/g" \
-		-e "s/REPLACE_V4_WALLET_ADDR/$(VALIDATOR4_WALLET_ADDR)/g" \
-		$(_NAMESPACE_SED) \
-		configmap-wallets.yaml | $(KUBECTL) apply -f -
+	@python3 -c "
+import sys
+env_vars = {}
+try:
+    with open('.env') as f:
+        for line in f:
+            line = line.strip()
+            if '=' in line and not line.startswith('#'):
+                k, v = line.split('=', 1)
+                env_vars[k] = v
+except FileNotFoundError:
+    pass
+ns = '$(NAMESPACE)'
+lines = [
+    'apiVersion: v1',
+    'kind: ConfigMap',
+    'metadata:',
+    '  name: wallets',
+    f'  namespace: {ns}',
+    'data:',
+    '  wallets.txt: |',
+]
+for i in range(1, 5):
+    addr = env_vars.get(f'VALIDATOR{i}_WALLET_ADDR', '')
+    if addr:
+        lines.append(f'    {addr},9000000000000000000')
+for i in range(1, 100):
+    addr = env_vars.get(f'K6_WALLET{i}_WALLET_ADDR', '')
+    if not addr:
+        break
+    lines.append(f'    {addr},1000000000000000000')
+print('\n'.join(lines))
+" | $(KUBECTL) apply -f -
 	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml; do \
 		sed \
 			-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
@@ -338,6 +367,9 @@ K6_NODE          ?= validator1
 K6_TAG           ?=
 K6_PRIVATE_KEYS  ?= $(VALIDATOR1_PRIVATE_KEY)
 K6_TOTAL_DEPLOYS ?= $(K6_VUS)
+# Comma-separated list of k6 wallet private keys (one per VU).
+# Populated from K6_WALLET*_PRIVATE_KEY entries in .env.
+K6_WALLET_KEYS   ?= $(shell grep '^K6_WALLET[0-9]*_PRIVATE_KEY=' .env 2>/dev/null | cut -d= -f2 | tr '\n' ',' | sed 's/,$$//')
 
 k6-build:
 	@echo "==> Building k6-tests image (xk6 + Go extension inside Docker)..."
@@ -362,6 +394,7 @@ k6-run:
 		-e "s|REPLACE_SCRIPT|$(K6_SCRIPT)|g" \
 		-e "s|REPLACE_RUN_ID|$$RUN_ID|g" \
 		-e "s|REPLACE_NODE_URL|$$NODE_URL|g" \
+		-e "s|REPLACE_WALLET_KEYS|$(K6_WALLET_KEYS)|g" \
 		-e "s|REPLACE_PRIVATE_KEYS|$(K6_PRIVATE_KEYS)|g" \
 		-e "s|REPLACE_TOTAL_DEPLOYS|$(K6_TOTAL_DEPLOYS)|g" \
 		-e "s|REPLACE_PRIVATE_KEY|$(VALIDATOR1_PRIVATE_KEY)|g" \

@@ -3,7 +3,7 @@
 //
 // Exported JS API:
 //
-//	import { signDeploy, helloWorldTerm, transferTerm, waitForBlock, parseDeployId } from "k6/x/asichain";
+//	import { signDeploy, helloWorldTerm, transferTerm, waitForBlock, waitForFinalization, parseDeployId } from "k6/x/asichain";
 package asichain
 
 import "go.k6.io/k6/js/modules"
@@ -27,11 +27,12 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
-			"signDeploy":     mi.SignDeploy,
-			"helloWorldTerm": HelloWorldTerm,
-			"transferTerm":   TransferTerm,
-			"waitForBlock":   WaitForBlock,
-			"parseDeployId":  ParseDeployId,
+			"signDeploy":          mi.SignDeploy,
+			"helloWorldTerm":      HelloWorldTerm,
+			"transferTerm":        TransferTerm,
+			"waitForBlock":        WaitForBlock,
+			"waitForFinalization": WaitForFinalization,
+			"parseDeployId":       ParseDeployId,
 		},
 	}
 }

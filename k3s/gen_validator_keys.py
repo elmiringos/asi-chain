@@ -123,9 +123,10 @@ def _extract_priv_sec1(der: bytes) -> str:
 
 if __name__ == "__main__":
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    prefix = sys.argv[2] if len(sys.argv) > 2 else "VALIDATOR"
     for idx in range(1, n + 1):
         priv, pub = gen_keypair()
         addr = wallet_address(pub)
-        print(f"VALIDATOR{idx}_PUBLIC_KEY={pub}")
-        print(f"VALIDATOR{idx}_PRIVATE_KEY={priv}")
-        print(f"VALIDATOR{idx}_WALLET_ADDR={addr}")
+        print(f"{prefix}{idx}_PUBLIC_KEY={pub}")
+        print(f"{prefix}{idx}_PRIVATE_KEY={priv}")
+        print(f"{prefix}{idx}_WALLET_ADDR={addr}")

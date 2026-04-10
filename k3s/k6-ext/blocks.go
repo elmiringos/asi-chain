@@ -32,6 +32,30 @@ func WaitForBlock(nodeUrl string, afterBlockNumber int64, timeoutSec int64) int6
 	}
 }
 
+// WaitForFinalization polls GET {nodeUrl}/api/last-finalized-block every 500ms until
+// the finalized blockNumber exceeds afterBlockNumber.
+// Returns the new finalized block number, or -1 if timeoutSec elapses.
+func WaitForFinalization(nodeUrl string, afterBlockNumber int64, timeoutSec int64) int64 {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return -1
+		case <-ticker.C:
+			if block := fetchLastFinalizedBlockNumber(client, nodeUrl); block > afterBlockNumber {
+				return block
+			}
+		}
+	}
+}
+
 // ParseDeployId extracts the deploy ID from the JSON response body of POST /api/deploy.
 // The node returns either a plain string or a JSON object with a "deployId" / "id" field.
 // Falls back to returning the raw body if parsing fails.
@@ -71,4 +95,28 @@ func fetchLatestBlockNumber(client *http.Client, nodeUrl string) int64 {
 		return -1
 	}
 	return blocks[0].BlockNumber
+}
+
+// fetchLastFinalizedBlockNumber fetches the last finalized block number from
+// GET /api/last-finalized-block, which returns BlockInfoSerde:
+// { "blockInfo": { "blockNumber": N, ... }, "deploys": [...] }
+func fetchLastFinalizedBlockNumber(client *http.Client, nodeUrl string) int64 {
+	resp, err := client.Get(nodeUrl + "/api/last-finalized-block")
+	if err != nil {
+		return -1
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return -1
+	}
+	var result struct {
+		BlockInfo struct {
+			BlockNumber int64 `json:"blockNumber"`
+		} `json:"blockInfo"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return -1
+	}
+	return result.BlockInfo.BlockNumber
 }

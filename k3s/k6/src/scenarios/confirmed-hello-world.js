@@ -15,23 +15,30 @@
  *
  * Env vars:
  *   NODE_URL         — target validator (default: validator1, port 40403)
- *   PRIVATE_KEY      — hex-encoded private key
+ *   WALLET_KEYS      — comma-separated private keys, one per VU (cycles if fewer than VUs)
+ *   PRIVATE_KEY      — single key fallback (used if WALLET_KEYS not set)
  *   SHARD_ID         — shard id (default: root)
- *   CONFIRM_TIMEOUT  — seconds to wait for block confirmation (default: 30)
+ *   CONFIRM_TIMEOUT  — seconds to wait for finalization (default: 30)
  *   VUS              — virtual users (default: 2)
  *   DURATION         — test duration (default: 120s)
  */
 import { check, sleep } from "k6";
 import { Trend, Counter, Gauge } from "k6/metrics";
-import { waitForBlock } from "k6/x/asichain";
-import { sendDeploy, getValidAfterBlockNumber, getLatestBlockInfo, HELLO_WORLD_TERM, estimateDeployProtoSize } from "../lib/deploy.js";
+import { waitForFinalization } from "k6/x/asichain";
+import { sendDeploy, getLastFinalizedBlockInfo, getLatestBlockInfo, HELLO_WORLD_TERM, estimateDeployProtoSize } from "../lib/deploy.js";
 import { annotateTestRun } from "../lib/summary.js";
 import { pushReport } from "../lib/report.js";
 
 const NODE_URL = __ENV.NODE_URL || "http://validator1-0.validator1.asi-chain.svc.cluster.local:40403";
-const PRIVATE_KEY = __ENV.PRIVATE_KEY || "";
 const SHARD_ID = __ENV.SHARD_ID || "root";
 const CONFIRM_TIMEOUT = __ENV.CONFIRM_TIMEOUT ? parseInt(__ENV.CONFIRM_TIMEOUT) : 30;
+
+// Each VU gets its own wallet to avoid concurrent-deploy conflicts from the same account.
+// WALLET_KEYS is a comma-separated list of private keys (one per VU, cycling if fewer than VUs).
+// Falls back to PRIVATE_KEY for backwards compatibility.
+const _walletKeys = (__ENV.WALLET_KEYS || __ENV.PRIVATE_KEY || "")
+  .split(",").map(s => s.trim()).filter(Boolean);
+const PRIVATE_KEY = _walletKeys[(__VU - 1) % Math.max(_walletKeys.length, 1)] || "";
 
 const confirmationTime = new Trend("deploy_confirmation_ms", true);
 const confirmedCounter = new Counter("deploy_confirmed");
@@ -56,13 +63,14 @@ export const options = {
 };
 
 export function setup() {
-  const blockNumber = getValidAfterBlockNumber(NODE_URL);
-  console.log(`confirmed-hello-world: setup blockNumber=${blockNumber}, timeout=${CONFIRM_TIMEOUT}s`);
+  const info = getLastFinalizedBlockInfo(NODE_URL);
+  const blockNumber = info.blockNumber;
+  console.log(`confirmed-hello-world: setup finalizedBlockNumber=${blockNumber}, timeout=${CONFIRM_TIMEOUT}s, wallets=${_walletKeys.length}`);
   blockNumberGauge.add(blockNumber);
-  return { validAfterBlockNumber: blockNumber, currentBlockNumber: blockNumber };
+  return { validAfterBlockNumber: blockNumber, currentFinalizedBlockNumber: blockNumber };
 }
 
-export default function ({ validAfterBlockNumber, currentBlockNumber }) {
+export default function ({ validAfterBlockNumber, currentFinalizedBlockNumber }) {
   const res = sendDeploy(NODE_URL, HELLO_WORLD_TERM, validAfterBlockNumber, PRIVATE_KEY, SHARD_ID);
 
   if (res.request && res.request.body) {
@@ -80,14 +88,14 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
   }
 
   const start = Date.now();
-  const newBlock = waitForBlock(NODE_URL, currentBlockNumber, CONFIRM_TIMEOUT);
+  const newFinalizedBlock = waitForFinalization(NODE_URL, currentFinalizedBlockNumber, CONFIRM_TIMEOUT);
 
-  if (newBlock > currentBlockNumber) {
+  if (newFinalizedBlock > currentFinalizedBlockNumber) {
     const elapsed = Date.now() - start;
     confirmationTime.add(elapsed);
     confirmedCounter.add(1);
-    const info = getLatestBlockInfo(NODE_URL);
-    blockNumberGauge.add(newBlock);
+    const info = getLastFinalizedBlockInfo(NODE_URL);
+    blockNumberGauge.add(newFinalizedBlock);
     if (_lastBlockNumber > 0 && info.blockNumber > _lastBlockNumber && info.timestamp > 0 && _lastBlockTimestamp > 0) {
       const timeDiff = info.timestamp - _lastBlockTimestamp;
       const blocksDiff = info.blockNumber - _lastBlockNumber;
@@ -95,10 +103,10 @@ export default function ({ validAfterBlockNumber, currentBlockNumber }) {
     }
     _lastBlockNumber = info.blockNumber;
     _lastBlockTimestamp = info.timestamp;
-    console.log(`deploy confirmed in block=${newBlock}, confirmation_ms=${elapsed}, deploys_in_block=${info.deployCount}, block_time_ms=${info.timestamp - _lastBlockTimestamp}`);
+    console.log(`deploy finalized in block=${newFinalizedBlock}, finalization_ms=${elapsed}, deploys_in_block=${info.deployCount}`);
   } else {
     unconfirmedCounter.add(1);
-    console.warn(`deploy NOT confirmed within ${CONFIRM_TIMEOUT}s (still at block ${currentBlockNumber})`);
+    console.warn(`deploy NOT finalized within ${CONFIRM_TIMEOUT}s (finalized at block ${currentFinalizedBlockNumber})`);
   }
 
   sleep(1);
