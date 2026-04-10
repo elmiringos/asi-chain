@@ -194,15 +194,11 @@ case "$PHASE" in
   phase5) MATRIX=("${PHASE5_MATRIX[@]}") ;;
   all)
     MATRIX=(
-      "0.2|2|1|2|confirm-hello|0.33|32"
-      "0.5|2|1|2|confirm-hello|0.33|32"
-      "1|2|1|2|confirm-hello|0.33|32"
-      "0.5|2|0.5|2|confirm-hello|0.33|32"
-      "0.5|2|2|2|confirm-hello|0.33|32"
-      "0.5|2|5|2|confirm-hello|0.33|32"
-      "0.5|2|1|5|confirm-hello|0.33|32"
-      "0.5|2|1|10|confirm-hello|0.33|32"
-      "0.5|2|1|20|confirm-hello|0.33|32"
+      "${PHASE1_MATRIX[@]}"
+      "${PHASE2_MATRIX[@]}"
+      "${PHASE3_MATRIX[@]}"
+      "${PHASE4_MATRIX[@]}"
+      "${PHASE5_MATRIX[@]}"
     )
     ;;
   p45)
