@@ -8,9 +8,8 @@
 #   - k6 image built (make k6-build)
 #
 # Usage:
-#   ./scripts/run-parallel-experiments.sh              # full matrix
-#   ./scripts/run-parallel-experiments.sh phase1       # phase 1 only
-#   CLEANUP=0 ./scripts/run-parallel-experiments.sh    # keep namespaces after run
+#   ./scripts/run-heartbeat-experiments-parallel.sh
+#   CLEANUP=0 ./scripts/run-heartbeat-experiments-parallel.sh    # keep namespaces after run
 #
 # Results: Grafana → k6 Perf Report, filter by testid prefix "hb-"
 #          Logs: ./logs/parallel-<timestamp>/
@@ -19,7 +18,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
-PHASE="${1:-all}"
 CLEANUP="${CLEANUP:-1}"       # set CLEANUP=0 to keep namespaces for debugging
 K6_DURATION="${EXP_K6_DURATION:-300s}"  # test duration per experiment (default: 5 min)
 LOG_DIR="${ROOT_DIR}/logs/parallel-$(date +%Y%m%d-%H%M%S)"
@@ -148,71 +146,36 @@ teardown_chain() {
 # Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario|synchrony_threshold|max_deploys"
 # Defaults when omitted: synchrony_threshold=0.33, max_deploys=32
 
-PHASE1_MATRIX=(
+# ── Experiment matrix ──────────────────────────────────────────────────────
+# Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario|synchrony_threshold|max_deploys"
+
+MATRIX=(
+  # Phase 1: check-interval sweep (cd=1s, vu=2)
   "0.2|2|1|2|confirm-hello|0.33|32"
   "0.5|2|1|2|confirm-hello|0.33|32"
   "1|2|1|2|confirm-hello|0.33|32"
-)
 
-PHASE2_MATRIX=(
-  "0.5|2|1|2|confirm-hello|0.33|32"   # baseline
+  # Phase 2: cooldown sweep (ci=0.5s, vu=2)
   "0.5|2|0.5|2|confirm-hello|0.33|32"
   "0.5|2|2|2|confirm-hello|0.33|32"
   "0.5|2|5|2|confirm-hello|0.33|32"
-)
 
-PHASE3_MATRIX=(
-  "0.5|2|1|2|confirm-hello|0.33|32"   # baseline
+  # Phase 3: load sweep (ci=0.5s, cd=1s)
   "0.5|2|1|5|confirm-hello|0.33|32"
   "0.5|2|1|10|confirm-hello|0.33|32"
   "0.5|2|1|20|confirm-hello|0.33|32"
-)
 
-# Phase 4: max-lfb-age sweep — how quickly heartbeat reacts to missing blocks
-# Best config from phases 1-2: ci=1s, cd=2s. Fixed: vu=5, threshold=0.33, max_deploys=32
-PHASE4_MATRIX=(
+  # Phase 4: max-lfb-age sweep (ci=1s, cd=2s, vu=5)
   "1|0.5|2|5|confirm-hello|0.33|32"
   "1|1|2|5|confirm-hello|0.33|32"
-  "1|2|2|5|confirm-hello|0.33|32"   # baseline
-)
+  "1|2|2|5|confirm-hello|0.33|32"
 
-# Phase 5: synchrony-threshold + block limit sweep
-# Goal: eliminate sync_warn bottleneck and measure throughput ceiling
-# Best config: ci=1s, cd=2s, lfb=2s, vu=10
-PHASE5_MATRIX=(
-  "1|2|2|10|confirm-hello|0.33|32"    # baseline (threshold=0.33, limit=32)
-  "1|2|2|10|confirm-hello|0|32"       # threshold=0 (remove sync constraint)
-  "1|2|2|10|confirm-hello|0|128"      # threshold=0 + high block limit
-  "1|2|2|10|confirm-hello|0.33|128"   # original threshold + high block limit
+  # Phase 5: synchrony-threshold + block limit sweep (ci=1s, lfb=2s, cd=2s, vu=10)
+  "1|2|2|10|confirm-hello|0.33|32"
+  "1|2|2|10|confirm-hello|0|32"
+  "1|2|2|10|confirm-hello|0|128"
+  "1|2|2|10|confirm-hello|0.33|128"
 )
-
-case "$PHASE" in
-  phase1) MATRIX=("${PHASE1_MATRIX[@]}") ;;
-  phase2) MATRIX=("${PHASE2_MATRIX[@]}") ;;
-  phase3) MATRIX=("${PHASE3_MATRIX[@]}") ;;
-  phase4) MATRIX=("${PHASE4_MATRIX[@]}") ;;
-  phase5) MATRIX=("${PHASE5_MATRIX[@]}") ;;
-  all)
-    MATRIX=(
-      "${PHASE1_MATRIX[@]}"
-      "${PHASE2_MATRIX[@]}"
-      "${PHASE3_MATRIX[@]}"
-      "${PHASE4_MATRIX[@]}"
-      "${PHASE5_MATRIX[@]}"
-    )
-    ;;
-  p45)
-    # Phases 4+5 only — for overnight follow-up run
-    MATRIX=(
-      "${PHASE4_MATRIX[@]}"
-      "${PHASE5_MATRIX[@]}"
-    )
-    ;;
-  *)
-    echo "Usage: $0 [all|phase1|phase2|phase3|phase4|phase5|p45]"
-    exit 1
-    ;;
-esac
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
@@ -224,7 +187,7 @@ fi
 
 log "=============================="
 log "  Parallel Experiment Runner"
-log "  Phase: ${PHASE} | ${#MATRIX[@]} experiments"
+log "  ${#MATRIX[@]} experiments"
 log "  Logs: ${LOG_DIR}"
 log "=============================="
 

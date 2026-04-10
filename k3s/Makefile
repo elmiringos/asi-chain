@@ -460,10 +460,8 @@ experiment:
 experiment-matrix:
 	@bash scripts/heartbeat-experiment-matrix.sh
 
-PHASE   ?= all
-
 experiment-parallel:
-	@CLEANUP=$(CLEANUP) EXP_K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh $(PHASE)
+	@CLEANUP=$(CLEANUP) EXP_K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh
 
 experiment-clean:
 	@echo "==> Deleting all experiment namespaces (exp-*)..."
