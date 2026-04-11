@@ -330,7 +330,7 @@ logs-api:
 #        make k6-mixed                (confirmed HelloWorld + Transfer)
 #        make k6-run K6_SCRIPT=... [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
 K6_VUS           ?= 5
-K6_DURATION      ?= 30s
+K6_DURATION      ?= 300s
 K6_SCRIPT        ?= hello-world
 K6_NODE          ?= validator1
 K6_TAG           ?=
@@ -358,6 +358,9 @@ k6-run:
 	else \
 		JOB_NAME="k6-$$SCRIPT_SLUG-$$RUN_ID"; \
 	fi; \
+	DUR="$(K6_DURATION)"; \
+	DUR_SEC=$$(echo "$$DUR" | awk '{d=$$0; if(d~/h/){sub(/h.*/,"",d);print d*3600} else if(d~/m/){sub(/m.*/,"",d);print d*60} else {sub(/s$$/,"",d);print d+0}}'); \
+	JOB_TTL=$$(( $$DUR_SEC * 2 + 3600 )); \
 	sed \
 		-e "s|REPLACE_JOB_NAME|$$JOB_NAME|g" \
 		-e "s|REPLACE_SCRIPT|$(K6_SCRIPT)|g" \
@@ -373,6 +376,7 @@ k6-run:
 		-e "s|REPLACE_ROUNDS|$(K6_CAPACITY_ROUNDS)|g" \
 		-e "s|REPLACE_VUS|$(K6_VUS)|g" \
 		-e "s|REPLACE_DURATION|$(K6_DURATION)|g" \
+		-e "s|REPLACE_TTL|$$JOB_TTL|g" \
 		k6/job.yaml | $(KUBECTL) apply -f -; \
 	echo "==> Job $$JOB_NAME started"; \
 	echo "    Node: $$NODE_URL"; \

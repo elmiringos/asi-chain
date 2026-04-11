@@ -6,7 +6,7 @@ metadata:
   labels:
     app: k6
 spec:
-  ttlSecondsAfterFinished: 300
+  ttlSecondsAfterFinished: REPLACE_TTL
   template:
     metadata:
       labels:

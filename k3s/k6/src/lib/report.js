@@ -43,8 +43,25 @@ function fetchBlocks(nodeUrl, startBlock, endBlock, count) {
  * @param {string} scriptName - scenario name used in Pushgateway job label
  * @param {string} nodeUrl    - blockchain node URL for block timestamp queries
  */
+// Parse heartbeat params from testid (e.g. hb-confirm-hello-ci1s-lfb2s-cd2s-vu10-sy0-md128)
+function parseTestidConfig(testid) {
+  const extract = (prefix) => {
+    const m = testid.match(new RegExp(`${prefix}([0-9.]+)`));
+    return m ? m[1] : null;
+  };
+  return {
+    ci:  extract("ci")  || "?",
+    lfb: extract("lfb") || "?",
+    cd:  extract("cd")  || "?",
+    vu:  extract("vu")  || "?",
+    sy:  extract("sy")  || "0.33",
+    md:  extract("md")  || "32",
+  };
+}
+
 export function pushReport(data, scriptName, nodeUrl) {
   const testid = __ENV.TESTID || scriptName;
+  const cfg = parseTestidConfig(testid);
   const m = data.metrics;
 
   // Block range from k6 Gauge
@@ -133,6 +150,11 @@ export function pushReport(data, scriptName, nodeUrl) {
     "# HELP k6_test_max_deploys_in_block Maximum deploys observed in a single block",
     "# TYPE k6_test_max_deploys_in_block gauge",
     `k6_test_max_deploys_in_block ${maxDeploys}`,
+
+    "",
+    "# HELP k6_experiment_config Heartbeat experiment configuration params (labels only, value=1)",
+    "# TYPE k6_experiment_config gauge",
+    `k6_experiment_config{ci="${cfg.ci}",lfb="${cfg.lfb}",cd="${cfg.cd}",vu="${cfg.vu}",sy="${cfg.sy}",md="${cfg.md}"} 1`,
   ];
 
   const payload = lines.join("\n") + "\n";

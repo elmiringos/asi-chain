@@ -133,14 +133,7 @@ collect_node_logs() {
   done
 }
 
-# Tear down the chain namespace.
-teardown_chain() {
-  local ns="$1" tag="$2"
-  collect_node_logs "$ns" "$tag"
-  log "[${tag}] Tearing down namespace ${ns}..."
-  $KUBECTL delete namespace "$ns" --ignore-not-found \
-    >> "${LOG_DIR}/${tag}-deploy.log" 2>&1 || true
-}
+# (teardown_chain removed — logs collected in Phase D, deletion in Phase E)
 
 # ── Experiment matrix ──────────────────────────────────────────────────────
 # Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario|synchrony_threshold|max_deploys"
@@ -265,12 +258,23 @@ for i in "${!TAGS[@]}"; do
 done
 for pid in "${K6_PIDS[@]}"; do wait "$pid" || true; done
 
-# ── Phase D: Cleanup (optional) ────────────────────────────────────────────
+# ── Phase D: Collect logs (always) ────────────────────────────────────────
+log ""
+log "--- Phase D: collecting node logs ---"
+declare -a LOG_PIDS
+for i in "${!TAGS[@]}"; do
+  collect_node_logs "${NAMESPACES[$i]}" "${TAGS[$i]}" &
+  LOG_PIDS+=($!)
+done
+for pid in "${LOG_PIDS[@]}"; do wait "$pid" || true; done
+
+# ── Phase E: Cleanup (optional) ────────────────────────────────────────────
 if [ "$CLEANUP" = "1" ]; then
   log ""
-  log "--- Phase D: tearing down namespaces ---"
+  log "--- Phase E: tearing down namespaces ---"
   for i in "${!TAGS[@]}"; do
-    teardown_chain "${NAMESPACES[$i]}" "${TAGS[$i]}" &
+    $KUBECTL delete namespace "${NAMESPACES[$i]}" --ignore-not-found \
+      >> "${LOG_DIR}/${TAGS[$i]}-deploy.log" 2>&1 &
   done
   wait
 fi

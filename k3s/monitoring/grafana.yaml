@@ -315,8 +315,8 @@ data:
           "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "min": 0, "custom": { "lineWidth": 2 } } },
           "targets": [
             {
-              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"asi-chain\", pod=~\"validator.*|bootstrap.*|observer.*\", container!=\"\", container!=\"POD\"}[1m])",
-              "legendFormat": "{{ pod }}"
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=~\"asi-chain|exp-.*\", pod=~\"validator.*|bootstrap.*|observer.*\", container!=\"\", container!=\"POD\"}[1m])",
+              "legendFormat": "{{namespace}}/{{pod}}"
             }
           ]
         },
@@ -327,8 +327,8 @@ data:
           "fieldConfig": { "defaults": { "unit": "bytes", "min": 0, "custom": { "lineWidth": 2 } } },
           "targets": [
             {
-              "expr": "container_memory_working_set_bytes{namespace=\"asi-chain\", pod=~\"validator.*|bootstrap.*|observer.*\", container!=\"\", container!=\"POD\"}",
-              "legendFormat": "{{ pod }}"
+              "expr": "container_memory_working_set_bytes{namespace=~\"asi-chain|exp-.*\", pod=~\"validator.*|bootstrap.*|observer.*\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{namespace}}/{{pod}}"
             }
           ]
         },
