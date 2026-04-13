@@ -99,9 +99,11 @@ start_log_streaming() {
       # Loop runs until killed by stop_log_streaming (no deadline).
       # Re-attaches automatically if kubectl exits (pod restart / transient error).
       while true; do
-        if $KUBECTL get pod "$pod" -n "$ns" &>/dev/null; then
+        phase=$($KUBECTL get pod "$pod" -n "$ns" \
+          -o jsonpath='{.status.phase}' 2>/dev/null || true)
+        if [ "$phase" = "Running" ]; then
           $KUBECTL logs -f "$pod" -n "$ns" --timestamps \
-            >> "${node_log_dir}/${pod}.log" 2>/dev/null
+            >> "${node_log_dir}/${pod}.log" 2>/dev/null || true
           sleep 2
         else
           sleep 3
