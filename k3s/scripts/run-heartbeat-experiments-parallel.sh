@@ -60,7 +60,7 @@ deploy_chain() {
   log "[${tag}] Chain deployed"
 }
 
-# Wait until ALL 6 pods (bootstrap, 4 validators, observer) are Running (up to 10 min).
+# Wait until ALL 5 pods (bootstrap, 3 validators, observer) are Running (up to 10 min).
 wait_chain_stable() {
   local ns="$1" tag="$2"
   log "[${tag}] Waiting for all pods to be Running..."
@@ -70,14 +70,14 @@ wait_chain_stable() {
     local total ready
     total=$($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | wc -l | tr -d ' ')
     ready=$($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "^[^ ]* *1/1.*Running" || true)
-    if [ "$total" -ge 6 ] && [ "$ready" -ge 6 ]; then
+    if [ "$total" -ge 5 ] && [ "$ready" -ge 5 ]; then
       sleep 30  # extra buffer for genesis ceremony and first blocks
       log "[${tag}] Chain stable (${ready}/${total} pods Running)"
       return 0
     fi
     log "[${tag}] Waiting for pods... (${ready}/${total} Running)"
   done
-  log "[${tag}] WARNING: only $($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "Running" || echo 0)/6 pods Running after 10 min — proceeding anyway"
+  log "[${tag}] WARNING: only $($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "Running" || echo 0)/5 pods Running after 10 min — proceeding anyway"
   return 0
 }
 
@@ -93,16 +93,15 @@ start_log_streaming() {
   local pid_file="${node_log_dir}/.stream_pids"
   : > "$pid_file"
   log "[${tag}] Starting real-time log streaming → ${node_log_dir}/"
-  for pod in bootstrap-0 validator1-0 validator2-0 validator3-0 validator4-0 observer-0; do
+  for pod in bootstrap-0 validator1-0 validator2-0 validator3-0 observer-0; do
     (
-      # Wait for pod to appear, then attach log stream from the very beginning.
-      local deadline=$(( $(date +%s) + 600 ))
-      while [ "$(date +%s)" -lt "$deadline" ]; do
+      # Wait for pod to appear, then stream logs from the very beginning.
+      # Loop runs until killed by stop_log_streaming (no deadline).
+      # Re-attaches automatically if kubectl exits (pod restart / transient error).
+      while true; do
         if $KUBECTL get pod "$pod" -n "$ns" &>/dev/null; then
-          # --follow --previous=false --since-time streams from container start
           $KUBECTL logs -f "$pod" -n "$ns" --timestamps \
             >> "${node_log_dir}/${pod}.log" 2>/dev/null
-          # If kubectl exits (pod restarted), re-attach to capture restart logs
           sleep 2
         else
           sleep 3

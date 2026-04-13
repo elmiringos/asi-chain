@@ -165,7 +165,7 @@ start:
 	@echo "==> Applying namespace, configmaps, pvcs, services..."
 	@sed $(_NAMESPACE_SED) namespace.yaml | $(KUBECTL) apply -f -
 	@python3 scripts/gen-wallets-configmap.py "$(NAMESPACE)" | $(KUBECTL) apply -f -
-	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml configmap-validator4.yaml; do \
+	@for cm in configmap-bonds.yaml configmap-bootstrap.yaml configmap-validator1.yaml configmap-validator2.yaml configmap-validator3.yaml; do \
 		sed \
 			-e "s/REPLACE_V1_PUBKEY/$(VALIDATOR1_PUBLIC_KEY)/g" \
 			-e "s/REPLACE_V2_PUBKEY/$(VALIDATOR2_PUBLIC_KEY)/g" \
