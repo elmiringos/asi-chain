@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# Run the heartbeat experiment matrix with all experiments in parallel.
+# Run the heartbeat-only experiment matrix in parallel (no k6 load).
 # Each experiment gets its own isolated k8s namespace so they don't interfere.
+# Node logs are streamed in real-time via `kubectl logs -f` to avoid log rotation loss.
 #
 # Prerequisites:
 #   - make gen already run (.env and .certs/ present)
 #   - monitoring stack running (make monitoring-start)
-#   - k6 image built (make k6-build)
 #
 # Usage:
 #   ./scripts/run-heartbeat-experiments-parallel.sh
-#   CLEANUP=0 ./scripts/run-heartbeat-experiments-parallel.sh    # keep namespaces after run
+#   EXP_DURATION=48h   ./scripts/run-heartbeat-experiments-parallel.sh
+#   CLEANUP=0          ./scripts/run-heartbeat-experiments-parallel.sh  # keep namespaces
 #
-# Results: Grafana → k6 Perf Report, filter by testid prefix "hb-"
-#          Logs: ./logs/parallel-<timestamp>/
+# Logs: ./logs/parallel-<timestamp>/<tag>-nodes/<pod>.log  (full, real-time)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECTL="sudo kubectl"
-CLEANUP="${CLEANUP:-1}"       # set CLEANUP=0 to keep namespaces for debugging
-K6_DURATION="${EXP_K6_DURATION:-300s}"  # test duration per experiment (default: 5 min)
+CLEANUP="${CLEANUP:-1}"         # set CLEANUP=0 to keep namespaces for debugging
+EXP_DURATION="${EXP_DURATION:-300s}"  # observation window per experiment (default: 5 min)
 LOG_DIR="${ROOT_DIR}/logs/parallel-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$LOG_DIR"
 
@@ -32,6 +32,15 @@ make_ns() {
 }
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
+
+# Convert duration string (48h / 30m / 300s) to seconds.
+duration_to_sec() {
+  echo "$1" | awk '{
+    if ($0 ~ /h/) { split($0, a, "h"); print a[1]*3600 + (a[2]+0)*60 }
+    else if ($0 ~ /m/) { split($0, a, "m"); print a[1]*60 + (a[2]+0) }
+    else { sub(/s$/,""); print $0+0 }
+  }'
+}
 
 # Deploy a chain in a given namespace with given heartbeat params.
 # Writes to LOG_DIR/<tag>-deploy.log
@@ -51,149 +60,124 @@ deploy_chain() {
   log "[${tag}] Chain deployed"
 }
 
-# Wait until all 4 validators are Ready in the given namespace (up to 5 min).
+# Wait until ALL 6 pods (bootstrap, 4 validators, observer) are Running (up to 10 min).
 wait_chain_stable() {
   local ns="$1" tag="$2"
-  log "[${tag}] Waiting for chain to stabilize..."
-  local deadline=$(( $(date +%s) + 300 ))
+  log "[${tag}] Waiting for all pods to be Running..."
+  local deadline=$(( $(date +%s) + 600 ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     sleep 10
-    # Count pods with all containers ready
     local total ready
-    total=$($KUBECTL get pods -n "$ns" \
-      -l "app=asi-chain" \
-      --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    ready=$($KUBECTL get pods -n "$ns" \
-      -l "app=asi-chain" \
-      --no-headers 2>/dev/null | grep -c "Running" || true)
-    if [ "$total" -ge 5 ] && [ "$ready" -ge 5 ]; then
-      # Extra 30s for genesis ceremony and first blocks
-      sleep 30
-      log "[${tag}] Chain stable (${ready}/${total} pods running)"
+    total=$($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    ready=$($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "^[^ ]* *1/1.*Running" || true)
+    if [ "$total" -ge 6 ] && [ "$ready" -ge 6 ]; then
+      sleep 30  # extra buffer for genesis ceremony and first blocks
+      log "[${tag}] Chain stable (${ready}/${total} pods Running)"
       return 0
     fi
+    log "[${tag}] Waiting for pods... (${ready}/${total} Running)"
   done
-  log "[${tag}] WARNING: chain may not be fully stable (proceeding anyway)"
+  log "[${tag}] WARNING: only $($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "Running" || echo 0)/6 pods Running after 10 min — proceeding anyway"
   return 0
 }
 
-# Run the k6 test and wait for it to complete.
-run_k6() {
-  local ns="$1" tag="$2" vus="$3" scenario="$4"
-  log "[${tag}] Starting k6 (vus=${vus}, scenario=${scenario})..."
-  local k6_script
-  case "$scenario" in
-    mixed)         k6_script="scenarios/mixed-deploy" ;;
-    confirm-hello) k6_script="scenarios/confirmed-hello-world" ;;
-    *)             echo "ERROR: unknown scenario '$scenario'"; return 1 ;;
-  esac
-  local start_log="${LOG_DIR}/${tag}-k6-start.log"
-  make -C "$ROOT_DIR" k6-run \
-    KUBECTL="sudo kubectl" \
-    NAMESPACE="$ns" \
-    K6_SCRIPT="$k6_script" \
-    K6_VUS="$vus" \
-    K6_DURATION="$K6_DURATION" \
-    K6_TAG="$tag" \
-    > "$start_log" 2>&1
-  # Parse job name from make output: "==> Job k6-<tag>-<runid> started"
-  local job
-  job=$(grep "^==> Job" "$start_log" | awk '{print $3}' || echo "")
-  if [ -z "$job" ]; then
-    log "[${tag}] WARNING: could not parse k6 job name from output"
-    return 0
-  fi
-  # Wait timeout = duration + 10 min buffer for startup/teardown
-  local duration_sec
-  duration_sec=$(echo "$K6_DURATION" | sed 's/s$//' | awk '{
-    if ($0 ~ /h/) { split($0, a, "h"); print a[1]*3600 + (a[2]+0)*60 }
-    else if ($0 ~ /m/) { split($0, a, "m"); print a[1]*60 + (a[2]+0) }
-    else print $0 + 0
-  }')
-  local wait_timeout=$(( duration_sec + 600 ))s
-  log "[${tag}] Waiting for k6 job: ${job} (timeout=${wait_timeout})"
-  $KUBECTL wait --for=condition=complete "job/${job}" -n monitoring \
-    --timeout="${wait_timeout}" >> "$start_log" 2>&1 || \
-    log "[${tag}] WARNING: k6 job ${job} did not complete cleanly"
-  # Save k6 pod output to disk
-  $KUBECTL logs -n monitoring -l "job-name=${job}" --tail=-1 \
-    > "${LOG_DIR}/${tag}-k6.log" 2>/dev/null || true
-  log "[${tag}] k6 done: ${tag}"
-}
-
-# Save logs from all node pods to disk before teardown.
-collect_node_logs() {
+# Start streaming logs from all node pods into files in real-time.
+# Retries kubectl logs -f until the pod exists (up to 10 min), so this can be
+# called immediately after `make start` — before pods are Running — and will
+# capture logs from the very first line.
+# PIDs are saved to <tag>-nodes/.stream_pids for later cleanup.
+start_log_streaming() {
   local ns="$1" tag="$2"
   local node_log_dir="${LOG_DIR}/${tag}-nodes"
   mkdir -p "$node_log_dir"
-  log "[${tag}] Collecting node logs → ${node_log_dir}/"
+  local pid_file="${node_log_dir}/.stream_pids"
+  : > "$pid_file"
+  log "[${tag}] Starting real-time log streaming → ${node_log_dir}/"
   for pod in bootstrap-0 validator1-0 validator2-0 validator3-0 validator4-0 observer-0; do
-    $KUBECTL logs "$pod" -n "$ns" \
-      > "${node_log_dir}/${pod}.log" 2>/dev/null || true
+    (
+      # Wait for pod to appear, then attach log stream from the very beginning.
+      local deadline=$(( $(date +%s) + 600 ))
+      while [ "$(date +%s)" -lt "$deadline" ]; do
+        if $KUBECTL get pod "$pod" -n "$ns" &>/dev/null; then
+          # --follow --previous=false --since-time streams from container start
+          $KUBECTL logs -f "$pod" -n "$ns" --timestamps \
+            >> "${node_log_dir}/${pod}.log" 2>/dev/null
+          # If kubectl exits (pod restarted), re-attach to capture restart logs
+          sleep 2
+        else
+          sleep 3
+        fi
+      done
+    ) &
+    echo $! >> "$pid_file"
   done
 }
 
-# (teardown_chain removed — logs collected in Phase D, deletion in Phase E)
+# Stop background log streaming processes for a given tag.
+stop_log_streaming() {
+  local tag="$1"
+  local pid_file="${LOG_DIR}/${tag}-nodes/.stream_pids"
+  if [ -f "$pid_file" ]; then
+    while read -r pid; do
+      kill "$pid" 2>/dev/null || true
+    done < "$pid_file"
+    rm -f "$pid_file"
+  fi
+}
 
 # ── Experiment matrix ──────────────────────────────────────────────────────
-# Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario|synchrony_threshold|max_deploys"
-# Defaults when omitted: synchrony_threshold=0.33, max_deploys=32
-
-# ── Experiment matrix ──────────────────────────────────────────────────────
-# Format: "interval_s|lfb_age_s|cooldown_s|vus|scenario|synchrony_threshold|max_deploys"
+# Best-performing configs from the 48h parallel run (parallel-20260411-055640).
+# No k6 load — pure heartbeat / consensus observation.
+#
+# Format: "interval_s|lfb_age_s|cooldown_s|synchrony_threshold|max_deploys"
+# Defaults: synchrony_threshold=0.33, max_deploys=32
 
 MATRIX=(
-  # Phase 1: check-interval sweep (cd=1s, vu=2)
-  "0.2|2|1|2|confirm-hello|0.33|32"
-  "0.5|2|1|2|confirm-hello|0.33|32"
-  "1|2|1|2|confirm-hello|0.33|32"
+  # From phase 1+2+3: ci=0.5s, lfb=2s, cd=1s — passed 48h, 550 543 confirmed, avg fin=528ms
+  "0.5|2|1|0.33|32"
 
-  # Phase 2: cooldown sweep (ci=0.5s, vu=2)
-  "0.5|2|0.5|2|confirm-hello|0.33|32"
-  "0.5|2|2|2|confirm-hello|0.33|32"
-  "0.5|2|5|2|confirm-hello|0.33|32"
+  # From phase 4: ci=1s, lfb=0.5s, cd=2s — passed 48h, 569 142 confirmed, avg fin=505ms
+  "1|0.5|2|0.33|32"
 
-  # Phase 3: load sweep (ci=0.5s, cd=1s)
-  "0.5|2|1|5|confirm-hello|0.33|32"
-  "0.5|2|1|10|confirm-hello|0.33|32"
-  "0.5|2|1|20|confirm-hello|0.33|32"
+  # From phase 4: ci=1s, lfb=1s, cd=2s — best latency (p95=505ms, max=564ms), 572 773 confirmed
+  "1|1|2|0.33|32"
 
-  # Phase 4: max-lfb-age sweep (ci=1s, cd=2s, vu=5)
-  "1|0.5|2|5|confirm-hello|0.33|32"
-  "1|1|2|5|confirm-hello|0.33|32"
-  "1|2|2|5|confirm-hello|0.33|32"
+  # From phase 5: ci=1s, lfb=2s, cd=2s, sy=0 — highest throughput, 1 144 788 confirmed
+  "1|2|2|0|32"
 
-  # Phase 5: synchrony-threshold + block limit sweep (ci=1s, lfb=2s, cd=2s, vu=10)
-  "1|2|2|10|confirm-hello|0.33|32"
-  "1|2|2|10|confirm-hello|0|32"
-  "1|2|2|10|confirm-hello|0|128"
-  "1|2|2|10|confirm-hello|0.33|128"
+  # New: ci=5s, lfb=10s, cd=10s — slower heartbeat, lower consensus overhead
+  "5|10|10|0.33|32"
 )
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
-# ── Pre-flight checks ─────────────────────────────────────────────────────
+# ── Pre-flight checks ──────────────────────────────────────────────────────
 if ! $KUBECTL get namespace monitoring &>/dev/null; then
   echo "ERROR: 'monitoring' namespace not found. Run 'make monitoring-start' first."
   exit 1
 fi
 
+EXP_DURATION_SEC=$(duration_to_sec "$EXP_DURATION")
+
 log "=============================="
-log "  Parallel Experiment Runner"
-log "  ${#MATRIX[@]} experiments"
+log "  Heartbeat Observation Runner"
+log "  ${#MATRIX[@]} experiments (no k6 load)"
+log "  Duration: ${EXP_DURATION} (${EXP_DURATION_SEC}s)"
 log "  Logs: ${LOG_DIR}"
 log "=============================="
 
-# Compute tags and namespaces
-declare -a TAGS NAMESPACES INTERVALS LFB_AGES COOLDOWNS VUS_LIST SCENARIOS SYNCHRONY_LIST MAX_DEPLOYS_LIST
+# Stop all log streaming on exit (SIGINT / SIGTERM / normal exit)
+trap 'log "Stopping log streams..."; for t in "${TAGS[@]}"; do stop_log_streaming "$t"; done' EXIT
+
+# ── Build tag / namespace arrays ───────────────────────────────────────────
+declare -a TAGS NAMESPACES INTERVALS LFB_AGES COOLDOWNS SYNCHRONY_LIST MAX_DEPLOYS_LIST
 
 for entry in "${MATRIX[@]}"; do
-  IFS='|' read -r interval lfb_age cooldown vus scenario synchrony max_deploys <<< "$entry"
+  IFS='|' read -r interval lfb_age cooldown synchrony max_deploys <<< "$entry"
   synchrony="${synchrony:-0.33}"
   max_deploys="${max_deploys:-32}"
 
-  # Include non-default params in tag for clarity
-  tag="hb-${scenario}-ci${interval}s-lfb${lfb_age}s-cd${cooldown}s-vu${vus}"
+  tag="hb-obs-ci${interval}s-lfb${lfb_age}s-cd${cooldown}s"
   [ "$synchrony"   != "0.33" ] && tag="${tag}-sy${synchrony}"
   [ "$max_deploys" != "32"   ] && tag="${tag}-md${max_deploys}"
 
@@ -203,8 +187,6 @@ for entry in "${MATRIX[@]}"; do
   INTERVALS+=("$interval")
   LFB_AGES+=("$lfb_age")
   COOLDOWNS+=("$cooldown")
-  VUS_LIST+=("$vus")
-  SCENARIOS+=("$scenario")
   SYNCHRONY_LIST+=("$synchrony")
   MAX_DEPLOYS_LIST+=("$max_deploys")
 done
@@ -233,9 +215,15 @@ if [ "$DEPLOY_FAILED" -gt 0 ]; then
   log "WARNING: ${DEPLOY_FAILED} deploy(s) failed. Continuing with successful ones."
 fi
 
-# ── Phase B: Wait for all chains to stabilize (parallel) ──────────────────
+# ── Phase B: Start log streaming + wait for chains to stabilize ───────────
+# Streaming starts immediately after deploy (before pods are Running) so that
+# genesis / initialization lines are never missed.
 log ""
-log "--- Phase B: waiting for all chains to stabilize ---"
+log "--- Phase B: starting log streaming and waiting for all pods to be Running ---"
+
+for i in "${!TAGS[@]}"; do
+  start_log_streaming "${NAMESPACES[$i]}" "${TAGS[$i]}"
+done
 
 declare -a WAIT_PIDS
 for i in "${!TAGS[@]}"; do
@@ -244,34 +232,28 @@ for i in "${!TAGS[@]}"; do
 done
 for pid in "${WAIT_PIDS[@]}"; do wait "$pid" || true; done
 
-# ── Phase C: Run k6 tests in parallel ──────────────────────────────────────
-# Note: k6 jobs all run in the shared `monitoring` namespace.
-# Running many simultaneously is fine — each has a unique job name and testid.
+# ── Phase C: Confirm log streaming is active ──────────────────────────────
 log ""
-log "--- Phase C: running ${#MATRIX[@]} k6 tests in parallel ---"
+log "--- Phase C: log streaming active, observation starting ---"
 
-declare -a K6_PIDS
-for i in "${!TAGS[@]}"; do
-  run_k6 "${NAMESPACES[$i]}" "${TAGS[$i]}" \
-    "${VUS_LIST[$i]}" "${SCENARIOS[$i]}" &
-  K6_PIDS+=($!)
-done
-for pid in "${K6_PIDS[@]}"; do wait "$pid" || true; done
-
-# ── Phase D: Collect logs (always) ────────────────────────────────────────
+# ── Phase D: Observe — wait for EXP_DURATION ──────────────────────────────
 log ""
-log "--- Phase D: collecting node logs ---"
-declare -a LOG_PIDS
-for i in "${!TAGS[@]}"; do
-  collect_node_logs "${NAMESPACES[$i]}" "${TAGS[$i]}" &
-  LOG_PIDS+=($!)
-done
-for pid in "${LOG_PIDS[@]}"; do wait "$pid" || true; done
+log "--- Phase D: observing for ${EXP_DURATION} (no load) ---"
+sleep "$EXP_DURATION_SEC"
+log "Observation window complete."
 
-# ── Phase E: Cleanup (optional) ────────────────────────────────────────────
+# ── Phase E: Stop log streaming ────────────────────────────────────────────
+log ""
+log "--- Phase E: stopping log streams ---"
+for i in "${!TAGS[@]}"; do
+  stop_log_streaming "${TAGS[$i]}"
+  log "[${TAGS[$i]}] logs saved → ${LOG_DIR}/${TAGS[$i]}-nodes/"
+done
+
+# ── Phase F: Cleanup (optional) ────────────────────────────────────────────
 if [ "$CLEANUP" = "1" ]; then
   log ""
-  log "--- Phase E: tearing down namespaces ---"
+  log "--- Phase F: tearing down namespaces ---"
   for i in "${!TAGS[@]}"; do
     $KUBECTL delete namespace "${NAMESPACES[$i]}" --ignore-not-found \
       >> "${LOG_DIR}/${TAGS[$i]}-deploy.log" 2>&1 &
@@ -283,12 +265,9 @@ fi
 log ""
 log "=============================="
 log "  Done!"
-log "  Open Grafana → k6 Perf Report"
-log "  Filter by testid prefix: hb-"
-log "  Compare: k6_test_avg_block_creation_time_ms across runs"
-log ""
-log "  Experiments:"
+log "  Duration: ${EXP_DURATION}"
+log "  Logs:"
 for i in "${!TAGS[@]}"; do
-  log "    ${TAGS[$i]}"
+  log "    ${LOG_DIR}/${TAGS[$i]}-nodes/"
 done
 log "=============================="

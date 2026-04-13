@@ -117,7 +117,7 @@ help:
 	@echo "    K6_VUS=<n>               Virtual users             (default: 2)"
 	@echo "    SCENARIO=<name>          confirm-hello | mixed     (default: confirm-hello)"
 	@echo "  experiment-matrix          Full heartbeat sweep matrix, sequential (~40 min)"
-	@echo "  experiment-parallel        Full heartbeat sweep matrix, parallel (~10 min)"
+	@echo "  experiment-parallel        Heartbeat-only observation (no k6 load), 4 best configs in parallel"
 	@echo "  experiment-clean           Delete all exp-* namespaces and k6 jobs"
 	@echo "    PHASE=phase1/.../phase5/p45/all  Which phase to run (default: all)"
 	@echo "    phase4: max-lfb-age sweep (ci=1s, cd=2s, vu=5)"
@@ -331,6 +331,7 @@ logs-api:
 #        make k6-run K6_SCRIPT=... [K6_NODE=validator1] [K6_VUS=5] [K6_DURATION=30s]
 K6_VUS           ?= 5
 K6_DURATION      ?= 300s
+EXP_DURATION     ?= 300s
 K6_SCRIPT        ?= hello-world
 K6_NODE          ?= validator1
 K6_TAG           ?=
@@ -465,7 +466,7 @@ experiment-matrix:
 	@bash scripts/heartbeat-experiment-matrix.sh
 
 experiment-parallel:
-	@CLEANUP=$(CLEANUP) EXP_K6_DURATION=$(K6_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh
+	@CLEANUP=$(CLEANUP) EXP_DURATION=$(EXP_DURATION) bash scripts/run-heartbeat-experiments-parallel.sh
 
 experiment-clean:
 	@echo "==> Deleting all experiment namespaces (exp-*)..."
