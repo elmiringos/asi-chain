@@ -68,8 +68,8 @@ wait_chain_stable() {
   while [ "$(date +%s)" -lt "$deadline" ]; do
     sleep 10
     local total ready
-    total=$($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    ready=$($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "^[^ ]* *1/1.*Running" || true)
+    total=$($KUBECTL get pods -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    ready=$($KUBECTL get pods -n "$ns" --no-headers 2>/dev/null | grep -c "^[^ ]* *1/1.*Running" || true)
     if [ "$total" -ge 5 ] && [ "$ready" -ge 5 ]; then
       sleep 30  # extra buffer for genesis ceremony and first blocks
       log "[${tag}] Chain stable (${ready}/${total} pods Running)"
@@ -77,7 +77,7 @@ wait_chain_stable() {
     fi
     log "[${tag}] Waiting for pods... (${ready}/${total} Running)"
   done
-  log "[${tag}] WARNING: only $($KUBECTL get pods -n "$ns" -l "app=asi-chain" --no-headers 2>/dev/null | grep -c "Running" || echo 0)/5 pods Running after 10 min — proceeding anyway"
+  log "[${tag}] WARNING: only $($KUBECTL get pods -n "$ns" --no-headers 2>/dev/null | grep -c "Running" || echo 0)/5 pods Running after 10 min — proceeding anyway"
   return 0
 }
 
